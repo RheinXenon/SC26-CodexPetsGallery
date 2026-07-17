@@ -310,8 +310,10 @@ function createCardPreview(pet, target, { eager = false } = {}) {
   target.style.setProperty("--preview-accent", pet.accent);
 
   const posterUrl = safeExternalUrl(pet.posterUrl);
+  const mediaStage = document.createElement("span");
   const poster = document.createElement("img");
   const fallback = document.createElement("span");
+  mediaStage.className = "preview-media-stage";
   poster.alt = `${pet.petName} 的预览`;
   poster.width = 192;
   poster.height = 208;
@@ -326,7 +328,8 @@ function createCardPreview(pet, target, { eager = false } = {}) {
     poster.hidden = true;
     fallback.hidden = false;
   }, { once: true });
-  target.append(poster, fallback);
+  mediaStage.append(poster);
+  target.append(mediaStage, fallback);
 
   let animator = null;
   let canvas = null;
@@ -337,9 +340,11 @@ function createCardPreview(pet, target, { eager = false } = {}) {
       if (reduceMotion || animator || !previewUrl) return;
       canvas = document.createElement("canvas");
       canvas.className = "sprite-canvas";
+      canvas.width = Number(pet.previewFrameWidth) || 96;
+      canvas.height = Number(pet.previewFrameHeight) || 104;
       canvas.setAttribute("role", "img");
       canvas.setAttribute("aria-label", `${pet.petName} 的${state.label}状态动画`);
-      target.append(canvas);
+      mediaStage.append(canvas);
       animator = new SpriteAnimator({
         canvas,
         url: previewUrl,
