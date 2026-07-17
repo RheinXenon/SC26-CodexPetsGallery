@@ -1,11 +1,19 @@
 export const GROUP_COUNT = 33;
 export const KNOWN_GROUPS = Object.freeze(
-  Array.from({ length: GROUP_COUNT }, (_, index) => `第 ${index + 1} 组`),
+  Array.from({ length: GROUP_COUNT }, (_, index) => String(index + 1)),
 );
-export const UNGROUPED_FILTER = "未填写分组";
 
 export function normalizeSearchText(value) {
   return String(value ?? "").normalize("NFKC").toLocaleLowerCase("zh-CN");
+}
+
+export function normalizeGroupNumber(value) {
+  const normalized = String(value ?? "").normalize("NFKC").trim();
+  if (!/^\d{1,2}$/.test(normalized)) return null;
+
+  const groupNumber = Number(normalized);
+  if (groupNumber < 1 || groupNumber > GROUP_COUNT) return null;
+  return String(groupNumber);
 }
 
 export function matchesSearch(pet, query) {
@@ -22,21 +30,7 @@ export function matchesSearch(pet, query) {
 }
 
 export function matchesGroup(pet, selectedGroup) {
-  if (!selectedGroup) return true;
-  if (selectedGroup === UNGROUPED_FILTER) {
-    return pet.kind === "submission" && !normalizeSearchText(pet.group).trim();
-  }
-  return normalizeSearchText(pet.group).includes(normalizeSearchText(selectedGroup).trim());
-}
-
-export function collectSubmissionGroups(pets) {
-  const groups = new Map();
-  for (const pet of pets) {
-    if (pet.kind !== "submission" || !pet.group) continue;
-    const normalized = normalizeSearchText(pet.group).trim();
-    if (normalized && !groups.has(normalized)) groups.set(normalized, pet.group.trim());
-  }
-  return [...groups.values()].sort((left, right) => (
-    left.localeCompare(right, "zh-CN", { numeric: true, sensitivity: "base" })
-  ));
+  if (!String(selectedGroup ?? "").trim()) return true;
+  const groupNumber = normalizeGroupNumber(selectedGroup);
+  return groupNumber !== null && normalizeGroupNumber(pet.group) === groupNumber;
 }

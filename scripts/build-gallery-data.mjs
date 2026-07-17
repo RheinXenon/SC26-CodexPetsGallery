@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
+import { normalizeGroupNumber } from "../site/gallery-filter.js";
 import { normalizeSpriteGrid, validateSpriteGrid } from "../site/sprite-format.js";
 
 const FIELD_LABELS = {
@@ -139,7 +140,7 @@ export function parseSubmission(issue) {
   const fields = extractFields(issue.body ?? "");
   const petName = extractPetName(issue.title ?? "");
   const nickname = cleanSingleLine(fields[FIELD_LABELS.nickname] ?? "", 50);
-  const group = cleanSingleLine(fields[FIELD_LABELS.group] ?? "", 50);
+  const group = normalizeGroupNumber(fields[FIELD_LABELS.group]);
   const description = cleanSingleLine(fields[FIELD_LABELS.description] ?? "", 160);
   const attachments = extractPetAttachments(fields[FIELD_LABELS.files]);
   const hasConsent = /-\s*\[x\]/i.test(fields[FIELD_LABELS.consent] ?? "");

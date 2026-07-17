@@ -23,8 +23,8 @@ body:
     id: group
     attributes:
       label: 所属分组
-      description: 选填，建议填写。请与夏令营公布的分组名称保持一致，方便你和组员在画廊中互相找到。
-      placeholder: 例如：第 3 组
+      description: 选填，建议填写。只填写 1-33 的数字，不要填写“第”和“组”，方便你和组员在画廊中互相找到。
+      placeholder: 例如：5
 
   - type: textarea
     id: description

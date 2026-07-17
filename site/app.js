@@ -5,11 +5,8 @@ import {
 } from "./sprite-format.js";
 import {
   KNOWN_GROUPS,
-  UNGROUPED_FILTER,
-  collectSubmissionGroups,
   matchesGroup,
   matchesSearch,
-  normalizeSearchText,
 } from "./gallery-filter.js";
 
 const DEFAULT_CONFIG = {
@@ -411,7 +408,7 @@ function renderCard(pet, index) {
     : `${pet.nickname} · @${pet.githubLogin}`;
   const group = card.querySelector(".pet-group");
   if (pet.kind === "submission" && pet.group) {
-    group.textContent = `所属分组：${pet.group}`;
+    group.textContent = `所属分组：第 ${pet.group} 组`;
     group.hidden = false;
   }
   card.setAttribute("aria-label", `查看 ${pet.petName} 的详情`);
@@ -513,7 +510,7 @@ function openDetail(pet) {
   elements.detailAuthor.textContent = pet.kind === "example"
     ? "由项目示例资源提供"
     : `${pet.nickname} · @${pet.githubLogin}`;
-  elements.detailGroup.textContent = pet.group ? `所属分组：${pet.group}` : "";
+  elements.detailGroup.textContent = pet.group ? `所属分组：第 ${pet.group} 组` : "";
   elements.detailGroup.hidden = pet.kind !== "submission" || !pet.group;
   elements.detailDescription.textContent = pet.description;
   elements.detailLinks.replaceChildren();
@@ -547,30 +544,12 @@ function applyConfig(config) {
   elements.submitLink.href = `https://github.com/${repository}/issues/new?template=pet-submission.yml`;
 }
 
-function populateGroupFilter(pets) {
-  const suggestions = [...KNOWN_GROUPS];
-  const knownGroups = new Set(KNOWN_GROUPS.map(normalizeSearchText));
-
-  for (const group of collectSubmissionGroups(pets)) {
-    const normalized = normalizeSearchText(group);
-    if (!knownGroups.has(normalized)) {
-      suggestions.push(group);
-      knownGroups.add(normalized);
-    }
-  }
-
+function populateGroupFilter() {
   elements.groupSuggestions.replaceChildren();
-  for (const group of suggestions) {
+  for (const group of KNOWN_GROUPS) {
     const option = document.createElement("option");
     option.value = group;
     elements.groupSuggestions.append(option);
-  }
-
-  const submissions = pets.filter((pet) => pet.kind === "submission");
-  if (submissions.some((pet) => !pet.group)) {
-    const ungroupedOption = document.createElement("option");
-    ungroupedOption.value = UNGROUPED_FILTER;
-    elements.groupSuggestions.append(ungroupedOption);
   }
 }
 
@@ -660,6 +639,12 @@ function applyFilters() {
   renderGallery();
 }
 
+function applyGroupFilter() {
+  const normalized = elements.groupFilter.value.normalize("NFKC");
+  elements.groupFilter.value = normalized.replace(/\D/g, "");
+  applyFilters();
+}
+
 async function initialize() {
   const configPromise = loadConfig().catch(() => DEFAULT_CONFIG);
   const examplesPromise = loadExamples();
@@ -685,7 +670,7 @@ async function initialize() {
   elements.submissionCount.textContent = String(submissions.pets.length);
   allPets = [...submissions.pets, ...examples];
   filteredPets = allPets;
-  populateGroupFilter(allPets);
+  populateGroupFilter();
   renderGallery();
 
   if (submissions.generatedAt) {
@@ -707,7 +692,7 @@ async function initialize() {
 
 elements.dialogClose.addEventListener("click", () => elements.dialog.close());
 elements.gallerySearch.addEventListener("input", applyFilters);
-elements.groupFilter.addEventListener("input", applyFilters);
+elements.groupFilter.addEventListener("input", applyGroupFilter);
 elements.previousPage.addEventListener("click", () => changePage(currentPage - 1));
 elements.nextPage.addEventListener("click", () => changePage(currentPage + 1));
 elements.dialog.addEventListener("click", (event) => {
