@@ -7,6 +7,7 @@ import { normalizeSpriteGrid, validateSpriteGrid } from "../site/sprite-format.j
 
 const FIELD_LABELS = {
   nickname: "学员昵称",
+  group: "所属分组",
   description: "一句话介绍",
   files: "宠物文件",
   consent: "公开展示确认",
@@ -138,6 +139,7 @@ export function parseSubmission(issue) {
   const fields = extractFields(issue.body ?? "");
   const petName = extractPetName(issue.title ?? "");
   const nickname = cleanSingleLine(fields[FIELD_LABELS.nickname] ?? "", 50);
+  const group = cleanSingleLine(fields[FIELD_LABELS.group] ?? "", 50);
   const description = cleanSingleLine(fields[FIELD_LABELS.description] ?? "", 160);
   const attachments = extractPetAttachments(fields[FIELD_LABELS.files]);
   const hasConsent = /-\s*\[x\]/i.test(fields[FIELD_LABELS.consent] ?? "");
@@ -148,6 +150,7 @@ export function parseSubmission(issue) {
     issueNumber: issue.number,
     petName,
     nickname,
+    group,
     description,
     githubLogin: issue.user.login,
     githubUrl: `https://github.com/${encodeURIComponent(issue.user.login)}`,

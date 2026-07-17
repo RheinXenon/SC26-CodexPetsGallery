@@ -18,9 +18,20 @@ import {
   normalizeSpriteGrid,
   resolveSpriteLayout,
 } from "../site/sprite-format.js";
+import {
+  GROUP_COUNT,
+  KNOWN_GROUPS,
+  UNGROUPED_FILTER,
+  collectSubmissionGroups,
+  matchesGroup,
+  matchesSearch,
+} from "../site/gallery-filter.js";
 
-const validBody = ({ nickname = "阿澈", suffix = "one" } = {}) => `### 学员昵称
+const validBody = ({ nickname = "阿澈", group = "第 3 组", suffix = "one" } = {}) => `### 学员昵称
 ${nickname}
+
+### 所属分组
+${group}
 
 ### 一句话介绍
 一只会帮我检查代码的小伙伴。
@@ -70,6 +81,7 @@ function makeVp8xHeader(width, height) {
 test("extractFields 读取 Issue Form 生成的标题字段", () => {
   const fields = extractFields(validBody());
   assert.equal(fields["学员昵称"], "阿澈");
+  assert.equal(fields["所属分组"], "第 3 组");
   assert.equal(extractPetName("[宠物投稿] 小火苗"), "小火苗");
   assert.match(fields["公开展示确认"], /\[x\]/);
 });
@@ -115,6 +127,7 @@ test("有效投稿会转成公开画廊数据", () => {
     issueNumber: 7,
     petName: "小火苗",
     nickname: "阿澈",
+    group: "第 3 组",
     description: "一只会帮我检查代码的小伙伴。",
     githubLogin: "student",
     githubUrl: "https://github.com/student",
@@ -123,6 +136,39 @@ test("有效投稿会转成公开画廊数据", () => {
     issueUrl: "https://github.com/owner/repo/issues/7",
     updatedAt: "2026-07-17T08:00:00Z",
   });
+});
+
+test("分组可以不填，且不影响投稿有效性", () => {
+  const submission = parseSubmission(issue({ body: validBody({ group: "_No response_" }) }));
+  assert.equal(submission.group, null);
+
+  const legacyBody = validBody().replace(/### 所属分组\n第 3 组\n\n/, "");
+  assert.equal(parseSubmission(issue({ body: legacyBody })).group, null);
+});
+
+test("分组可用于全文搜索、候选选择和手动输入筛选", () => {
+  const pets = [
+    { kind: "submission", petName: "小火苗", nickname: "阿澈", group: "第 3 组" },
+    { kind: "submission", petName: "小水滴", nickname: "小岚", group: "第 12 组" },
+    { kind: "submission", petName: "小云朵", nickname: "小夏", group: null },
+    { kind: "example", petName: "示例", nickname: "SC26 示例" },
+  ];
+
+  assert.equal(matchesSearch(pets[0], "第 3 组"), true);
+  assert.equal(matchesSearch(pets[1], "第 3 组"), false);
+  assert.equal(matchesGroup(pets[0], "第 3 组"), true);
+  assert.equal(matchesGroup(pets[1], "第 3 组"), false);
+  assert.equal(matchesGroup(pets[0], "第 3"), true);
+  assert.equal(matchesGroup(pets[2], UNGROUPED_FILTER), true);
+  assert.equal(matchesGroup(pets[3], UNGROUPED_FILTER), false);
+  assert.deepEqual(collectSubmissionGroups(pets), ["第 3 组", "第 12 组"]);
+});
+
+test("分组候选预置第 1 组到第 33 组", () => {
+  assert.equal(GROUP_COUNT, 33);
+  assert.equal(KNOWN_GROUPS.length, 33);
+  assert.equal(KNOWN_GROUPS[0], "第 1 组");
+  assert.equal(KNOWN_GROUPS.at(-1), "第 33 组");
 });
 
 test("未确认公开展示和已关闭投稿会被丢弃", () => {

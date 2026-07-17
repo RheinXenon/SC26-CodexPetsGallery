@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SummerCamp 2026 学员宠物作品画廊">
     <title>SC26 宠物画廊</title>
-    <link rel="stylesheet" href="styles.css?v=20260717-5">
-    <script type="module" src="app.js?v=20260717-5"></script>
+    <link rel="stylesheet" href="styles.css?v=20260718-1">
+    <script type="module" src="app.js?v=20260718-1"></script>
   </head>
   <body>
     <header class="site-header">
@@ -31,15 +31,28 @@
       </section>
 
       <section class="gallery-tools" id="gallery-tools" aria-label="筛选宠物作品">
-        <label class="search-field" for="gallery-search">
-          <span class="search-label">搜索</span>
-          <input
-            id="gallery-search"
-            type="search"
-            placeholder="宠物名、作者或介绍"
-            autocomplete="off"
-          >
-        </label>
+        <div class="filter-fields">
+          <label class="search-field" for="gallery-search">
+            <span class="search-label">搜索宠物</span>
+            <input
+              id="gallery-search"
+              type="search"
+              placeholder="宠物名、作者、分组或介绍"
+              autocomplete="off"
+            >
+          </label>
+          <label class="group-field" for="group-filter">
+            <span class="search-label">搜索分组</span>
+            <input
+              id="group-filter"
+              type="search"
+              list="group-suggestions"
+              placeholder="选择或输入第 1-33 组"
+              autocomplete="off"
+            >
+            <datalist id="group-suggestions"></datalist>
+          </label>
+        </div>
         <p class="result-summary" id="result-summary" aria-live="polite"></p>
       </section>
 
@@ -71,6 +84,7 @@
           <p class="detail-kind" id="detail-kind"></p>
           <h2 id="detail-title"></h2>
           <p class="detail-author" id="detail-author"></p>
+          <p class="detail-group" id="detail-group" hidden></p>
           <p class="detail-description" id="detail-description"></p>
         </header>
 
@@ -100,6 +114,7 @@
           <span class="pet-label"></span>
           <strong class="pet-name"></strong>
           <span class="pet-description"></span>
+          <span class="pet-group" hidden></span>
           <span class="pet-byline"></span>
         </span>
       </button>
