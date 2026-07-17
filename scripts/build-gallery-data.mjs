@@ -11,7 +11,11 @@ const FIELD_LABELS = {
 };
 
 const PET_TITLE_PREFIX = "[宠物投稿]";
-const MAX_CONFIG_BYTES = 100_000;
+const MAX_SPRITE_BYTES = 10 * 1024 * 1024;
+const EXPECTED_SPRITE_FORMATS = new Map([
+  ["1536x1872", { formatVersion: "v1", rows: 9 }],
+  ["1536x2288", { formatVersion: "v2", rows: 11 }],
+]);
 
 const ALLOWED_ATTACHMENT_HOSTS = new Set([
   "user-images.githubusercontent.com",
@@ -147,54 +151,77 @@ export function parseSubmission(issue) {
   };
 }
 
-function sanitizeSpriteGrid(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const states = Array.isArray(value.states)
-    ? value.states.slice(0, 11).map((state) => ({
-        id: cleanSingleLine(String(state?.id ?? ""), 40),
-        label: cleanSingleLine(String(state?.label ?? ""), 30),
-        row: Number(state?.row),
-        frames: Number(state?.frames),
-        frameDuration: Number(state?.frameDuration),
-        description: cleanSingleLine(String(state?.description ?? ""), 100),
-      })).filter((state) => state.id && state.label)
-    : undefined;
-
-  return {
-    formatVersion: value.formatVersion === "v2" || Number(value.rows) === 11 ? "v2" : "v1",
-    columns: Number(value.columns) || 8,
-    rows: Number(value.rows) || (value.formatVersion === "v2" ? 11 : 9),
-    defaultState: cleanSingleLine(String(value.defaultState ?? "idle"), 40),
-    ...(states ? { states } : {}),
-  };
+function readUInt24LE(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
 }
 
-export async function hydrateSubmission(submission, { fetchImpl = fetch, token } = {}) {
-  try {
-    const headers = { Accept: "application/json" };
-    if (token && isAllowedGithubAttachment(submission.petConfigUrl)) {
-      headers.Authorization = `Bearer ${token}`;
+export function readWebpDimensions(source) {
+  const bytes = Buffer.from(source);
+  if (bytes.length < 20 || bytes.toString("ascii", 0, 4) !== "RIFF"
+    || bytes.toString("ascii", 8, 12) !== "WEBP") return null;
+
+  for (let offset = 12; offset + 8 <= bytes.length;) {
+    const type = bytes.toString("ascii", offset, offset + 4);
+    const size = bytes.readUInt32LE(offset + 4);
+    const dataOffset = offset + 8;
+    if (dataOffset + size > bytes.length) return null;
+
+    if (type === "VP8X" && size >= 10) {
+      return {
+        width: readUInt24LE(bytes, dataOffset + 4) + 1,
+        height: readUInt24LE(bytes, dataOffset + 7) + 1,
+      };
     }
-    const response = await fetchImpl(submission.petConfigUrl, {
-      headers,
+    if (type === "VP8L" && size >= 5 && bytes[dataOffset] === 0x2f) {
+      const bits = bytes.readUInt32LE(dataOffset + 1);
+      return {
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >>> 14) & 0x3fff) + 1,
+      };
+    }
+    if (type === "VP8 " && size >= 10
+      && bytes[dataOffset + 3] === 0x9d
+      && bytes[dataOffset + 4] === 0x01
+      && bytes[dataOffset + 5] === 0x2a) {
+      return {
+        width: bytes.readUInt16LE(dataOffset + 6) & 0x3fff,
+        height: bytes.readUInt16LE(dataOffset + 8) & 0x3fff,
+      };
+    }
+
+    offset = dataOffset + size + (size % 2);
+  }
+
+  return null;
+}
+
+export async function hydrateSubmission(submission, { fetchImpl = fetch } = {}) {
+  try {
+    const response = await fetchImpl(submission.spritesheetUrl, {
+      headers: { Accept: "image/webp" },
     });
     if (!response.ok) return null;
 
     const declaredSize = Number(response.headers?.get?.("content-length") ?? 0);
-    if (declaredSize > MAX_CONFIG_BYTES) return null;
-    const source = await response.text();
-    if (Buffer.byteLength(source, "utf8") > MAX_CONFIG_BYTES) return null;
-    const config = JSON.parse(source);
-    if (!config || typeof config !== "object" || Array.isArray(config)) return null;
-    if (!cleanSingleLine(String(config.id ?? ""), 80)) return null;
-    if (config.spritesheetPath !== "spritesheet.webp") return null;
+    if (declaredSize > MAX_SPRITE_BYTES) return null;
+    const source = Buffer.from(await response.arrayBuffer());
+    if (source.byteLength > MAX_SPRITE_BYTES) return null;
+    const dimensions = readWebpDimensions(source);
+    const format = dimensions
+      ? EXPECTED_SPRITE_FORMATS.get(`${dimensions.width}x${dimensions.height}`)
+      : null;
+    if (!format) return null;
 
-    const spriteGrid = normalizeSpriteGrid(sanitizeSpriteGrid(config.spriteGrid) ?? {});
+    const spriteGrid = normalizeSpriteGrid({
+      formatVersion: format.formatVersion,
+      columns: 8,
+      rows: format.rows,
+    });
     if (!validateSpriteGrid(spriteGrid)) return null;
 
     return {
       ...submission,
-      petId: cleanSingleLine(String(config.id), 80),
+      petId: `issue-${submission.issueNumber}`,
       spriteGrid,
     };
   } catch {
@@ -219,7 +246,7 @@ export function selectLatestSubmissions(issues) {
 
 export async function selectLatestValidSubmissions(
   issues,
-  { fetchImpl = fetch, token, onRejected = () => {} } = {},
+  { fetchImpl = fetch, onRejected = () => {} } = {},
 ) {
   const latestByAccount = new Map();
   const sorted = [...issues].sort(
@@ -236,11 +263,11 @@ export async function selectLatestValidSubmissions(
       onRejected(issue, "同一账号已有更新的有效投稿");
       continue;
     }
-    const submission = await hydrateSubmission(candidate, { fetchImpl, token });
+    const submission = await hydrateSubmission(candidate, { fetchImpl });
     if (submission) {
       latestByAccount.set(submission.githubLogin, submission);
     } else {
-      onRejected(issue, "pet.json 无法读取或未通过格式校验");
+      onRejected(issue, "spritesheet.webp 无法读取、超过 10 MB 或尺寸不符合 v1/v2 标准");
     }
   }
 
@@ -302,7 +329,6 @@ export async function buildGalleryData({
   const rejected = [];
   const pets = await selectLatestValidSubmissions(issues, {
     fetchImpl,
-    token,
     onRejected: (issue, reason) => rejected.push({ number: issue.number, reason }),
   });
   const data = {

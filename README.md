@@ -2,7 +2,7 @@
 
 这是 SummerCamp 2026 学员宠物画廊的个人仓库原型。学员通过 GitHub Issue Form 投稿，GitHub Actions 汇总有效投稿并部署静态页面；页面始终展示三个示例宠物，示例不计入投稿数量。
 
-示例宠物直接保留原始 `spritesheet.webp`。浏览器根据 `pet.json` 中的网格和状态数据，用 Canvas 裁切并播放各行帧动画；项目不会在构建时生成缩略图或动画文件，也没有处理图片的后端服务。
+示例宠物直接保留原始 `spritesheet.webp`。浏览器根据安全的标准网格配置，用 Canvas 裁切并播放各行帧动画；项目不会在构建时生成缩略图或动画文件，也没有处理图片的后端服务。
 
 ## 本地预览
 
@@ -63,9 +63,9 @@ gallery.config.json      # 可迁移的仓库与页面配置
 2. 创建名为 `pet-submission` 的标签。Issue Form 引用的标签必须预先存在。
 3. 推送本项目到 `main` 分支。
 4. 在仓库的 Pages 设置中把来源设为 **GitHub Actions**。
-5. 打开一次“提交我的宠物”表单，确认 `pet.json` 和 `spritesheet.webp` 都上传完成后再提交。
+5. 打开一次“提交我的宠物”表单，通过专用附件控件上传 `pet.json` 和 `spritesheet.webp`，确认两个文件都完成后再提交。
 
-工作流监听投稿 Issue 的新建、编辑、关闭和重新打开，也可以手动运行。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，读取并校验不超过 100 KB 的 `pet.json`，然后按 GitHub 账号保留最近更新的一条有效投稿。精灵图只在浏览器中按帧显示，不会执行投稿文件中的代码。
+工作流监听投稿 Issue 的新建、编辑、关闭和重新打开，也可以手动运行。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
 
 ## 投稿有效条件
 
@@ -74,7 +74,7 @@ gallery.config.json      # 可迁移的仓库与页面配置
 - Issue 处于开启状态，并带有 `pet-submission` 标签；
 - Issue 标题中填写了宠物名，学员昵称和一句话介绍不为空；
 - 同时上传了名为 `pet.json` 和 `spritesheet.webp` 的 GitHub 附件；
-- `pet.json` 是有效 JSON，包含 `id`，并且 `spritesheetPath` 为 `spritesheet.webp`；
+- `spritesheet.webp` 是有效 WebP，尺寸为 v1 的 1536×1872 或 v2 的 1536×2288，且不超过 10 MB；
 - 已勾选公开展示确认；
 - Issue 不是 Pull Request。
 

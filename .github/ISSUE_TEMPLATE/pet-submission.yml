@@ -28,14 +28,14 @@ body:
     validations:
       required: true
 
-  - type: textarea
+  - type: upload
     id: pet-files
     attributes:
       label: 宠物文件
       description: 将 `pet.json` 和 `spritesheet.webp` 一起拖到这里，等待两个文件都上传完成后再提交。请保留这两个文件名。
-      placeholder: 把 pet.json 和 spritesheet.webp 拖到这里
     validations:
       required: true
+      accept: ".json,.webp"
 
   - type: checkboxes
     id: consent

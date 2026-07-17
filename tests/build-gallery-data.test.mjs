@@ -10,6 +10,7 @@ import {
   hydrateSubmission,
   isAllowedGithubAttachment,
   parseSubmission,
+  readWebpDimensions,
   selectLatestSubmissions,
   selectLatestValidSubmissions,
 } from "../scripts/build-gallery-data.mjs";
@@ -43,6 +44,27 @@ function issue(overrides = {}) {
     updated_at: "2026-07-17T08:00:00Z",
     ...overrides,
   };
+}
+
+function responseForBytes(bytes) {
+  const copy = Uint8Array.from(bytes);
+  return {
+    ok: true,
+    headers: { get: () => String(copy.byteLength) },
+    arrayBuffer: async () => copy.buffer,
+  };
+}
+
+function makeVp8xHeader(width, height) {
+  const bytes = Buffer.alloc(30);
+  bytes.write("RIFF", 0, "ascii");
+  bytes.writeUInt32LE(22, 4);
+  bytes.write("WEBP", 8, "ascii");
+  bytes.write("VP8X", 12, "ascii");
+  bytes.writeUInt32LE(10, 16);
+  bytes.writeUIntLE(width - 1, 24, 3);
+  bytes.writeUIntLE(height - 1, 27, 3);
+  return bytes;
 }
 
 test("extractFields 读取 Issue Form 生成的标题字段", () => {
@@ -127,58 +149,36 @@ test("同一账号只保留最近更新的有效投稿", () => {
   assert.equal(selected.find((pet) => pet.githubLogin === "student").petName, "新宠物");
 });
 
-test("pet.json 通过校验后会补齐精灵图配置", async () => {
+test("标准 WebP 精灵图通过校验后会生成安全配置", async () => {
   const submission = parseSubmission(issue());
+  const spritesheet = await readFile(
+    new URL("../site/examples/bananacat/spritesheet.webp", import.meta.url),
+  );
   const hydrated = await hydrateSubmission(submission, {
-    fetchImpl: async () => ({
-      ok: true,
-      headers: { get: () => "120" },
-      text: async () => JSON.stringify({
-        id: "spark",
-        spritesheetPath: "spritesheet.webp",
-      }),
-    }),
+    fetchImpl: async (url) => {
+      assert.equal(url, submission.spritesheetUrl);
+      return responseForBytes(spritesheet);
+    },
   });
 
-  assert.equal(hydrated.petId, "spark");
+  assert.equal(hydrated.petId, "issue-7");
+  assert.equal(hydrated.spriteGrid.formatVersion, "v1");
   assert.equal(hydrated.spriteGrid.columns, 8);
   assert.equal(hydrated.spriteGrid.states.length, 9);
 });
 
-test("读取 GitHub pet.json 附件时会使用 Actions 令牌", async () => {
-  const submission = parseSubmission(issue());
-  let requestHeaders;
-  await hydrateSubmission(submission, {
-    token: "test-token",
-    fetchImpl: async (_url, options) => {
-      requestHeaders = options.headers;
-      return {
-        ok: true,
-        headers: { get: () => "120" },
-        text: async () => JSON.stringify({ id: "spark", spritesheetPath: "spritesheet.webp" }),
-      };
-    },
+test("WebP 头可以识别 v2 精灵图尺寸", () => {
+  assert.deepEqual(readWebpDimensions(makeVp8xHeader(1536, 2288)), {
+    width: 1536,
+    height: 2288,
   });
-
-  assert.equal(requestHeaders.Authorization, "Bearer test-token");
-});
-
-test("Actions 令牌不会发送给 GitHub 附件域名之外的地址", async () => {
-  let requestHeaders;
-  await hydrateSubmission({
-    petConfigUrl: "https://example.com/pet.json",
-  }, {
-    token: "test-token",
-    fetchImpl: async (_url, options) => {
-      requestHeaders = options.headers;
-      return { ok: false };
-    },
-  });
-
-  assert.equal(requestHeaders.Authorization, undefined);
+  assert.equal(readWebpDimensions(Buffer.from("not webp")), null);
 });
 
 test("同一账号的最新附件无效时会回退到较早的有效投稿", async () => {
+  const spritesheet = await readFile(
+    new URL("../site/examples/bananacat/spritesheet.webp", import.meta.url),
+  );
   const older = issue({ number: 1, updated_at: "2026-07-16T08:00:00Z" });
   const newer = issue({
     number: 2,
@@ -187,13 +187,9 @@ test("同一账号的最新附件无效时会回退到较早的有效投稿", as
     body: validBody({ suffix: "invalid" }),
   });
   const selected = await selectLatestValidSubmissions([older, newer], {
-    fetchImpl: async (url) => ({
-      ok: true,
-      headers: { get: () => "120" },
-      text: async () => url.includes("invalid")
-        ? "not json"
-        : JSON.stringify({ id: "spark", spritesheetPath: "spritesheet.webp" }),
-    }),
+    fetchImpl: async (url) => responseForBytes(
+      url.includes("invalid") ? Buffer.from("not webp") : spritesheet,
+    ),
   });
 
   assert.equal(selected.length, 1);
