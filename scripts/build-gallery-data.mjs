@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
-import { normalizeGroupNumber } from "../site/gallery-filter.js";
-import { normalizeSpriteGrid, validateSpriteGrid } from "../site/sprite-format.js";
+import { normalizeGroupNumber } from "../lib/gallery-filter.js";
+import { normalizeSpriteGrid, validateSpriteGrid } from "../lib/sprite-format.js";
 
 const FIELD_LABELS = {
   nickname: "学员昵称",
@@ -228,7 +228,7 @@ async function materializePreviewAssets(rootDir, previewAssets) {
   if (!previewAssets?.posterUrl || !previewAssets?.previewUrl) return false;
 
   const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
-  const publishedDir = path.join(rootDir, "site", "generated", "previews");
+  const publishedDir = path.join(rootDir, "web", "public", "generated", "previews");
   const posterName = path.posix.basename(previewAssets.posterUrl);
   const previewName = path.posix.basename(previewAssets.previewUrl);
   const cachedPoster = path.join(cacheDir, posterName);
@@ -458,7 +458,7 @@ async function savePreviewCache(rootDir, cache) {
 }
 
 async function buildExamplePreviews(rootDir) {
-  const examplesDir = path.join(rootDir, "site", "examples");
+  const examplesDir = path.join(rootDir, "web", "public", "examples");
   const ids = JSON.parse(await readFile(path.join(examplesDir, "manifest.json"), "utf8"));
   const entries = await Promise.all(ids.map(async (id) => {
     const petDir = path.join(examplesDir, id);
@@ -551,15 +551,16 @@ export async function buildGalleryData({
     generatedAt: new Date().toISOString(),
     pets,
   };
-  const siteDir = path.join(rootDir, "site");
+  const publicDir = path.join(rootDir, "web", "public");
+  await mkdir(publicDir, { recursive: true });
 
-  await writeFile(path.join(siteDir, "pets.json"), `${JSON.stringify(data, null, 2)}\n`);
+  await writeFile(path.join(publicDir, "pets.json"), `${JSON.stringify(data, null, 2)}\n`);
   await writeFile(
-    path.join(siteDir, "previews.json"),
+    path.join(publicDir, "previews.json"),
     `${JSON.stringify({ examples: examplePreviews }, null, 2)}\n`,
   );
   await writeFile(
-    path.join(siteDir, "gallery.config.json"),
+    path.join(publicDir, "gallery.config.json"),
     `${JSON.stringify({ ...config, repository: targetRepository }, null, 2)}\n`,
   );
   await savePreviewCache(rootDir, previewCache);

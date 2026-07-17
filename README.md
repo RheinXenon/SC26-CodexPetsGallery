@@ -2,22 +2,31 @@
 
 这是 SummerCamp 2026 学员宠物画廊的个人仓库原型。学员通过 GitHub Issue Form 投稿，GitHub Actions 汇总有效投稿并部署静态页面；页面始终展示三个示例宠物，示例不计入投稿数量。
 
-示例宠物直接保留原始 `spritesheet.webp`。构建脚本在校验完整精灵图时，同时生成默认状态封面和低分辨率动画预览；画廊列表懒加载这些轻量资源，只在宠物进入可视区域时播放预览，打开详情后才读取完整精灵图。页面支持按宠物名、作者、分组和介绍搜索；分组搜索预置 1 到 33，也允许直接输入数字，并按每页 40 只分页展示。所有图片处理都在 GitHub Actions 构建阶段完成，不需要后端图片服务。
+前端使用 **Vite + Preact + TypeScript + Tailwind** 构建为静态站点，视觉为产品级图鉴风格。列表仍采用构建期生成的封面/低分辨率预览，详情才加载完整精灵图。支持搜索、分组筛选、分页、卡片密度切换、分享深链（`?pet=`）与多宠合影导出。
 
 ## 本地预览
 
-需要 Node.js 20 或更高版本，以及任意可用的静态文件服务器。
+需要 Node.js 20 或更高版本。
 
 ```powershell
 npm install
 npm test
 npm run build:data:empty
-D:\miniconda3\envs\daily\python.exe -m http.server 4173 --directory site
+npm run dev
 ```
 
-然后访问 `http://localhost:4173/`。`build:data:empty` 会生成被 Git 忽略的 `site/pets.json`、运行时配置、示例预览索引和预览图片，用来模拟“尚无真实投稿”的状态。
+然后访问 `http://localhost:4173/`。`build:data:empty` 会生成被 Git 忽略的 `web/public/pets.json`、运行时配置、示例预览索引和预览图片。
 
-如需在本地读取真实 Issue，先设置只读范围的 GitHub Token：
+生产构建：
+
+```powershell
+npm run build:data:empty
+npm run build
+# 产物在 dist/，可用任意静态服务器预览
+npm run preview
+```
+
+如需在本地读取真实 Issue：
 
 ```powershell
 $env:GITHUB_TOKEN = "你的 Token"
@@ -31,61 +40,60 @@ npm run build:data
 .github/
   ISSUE_TEMPLATE/       # 投稿表单
   workflows/            # Pages 构建与部署
-scripts/                 # Issue 解析和数据生成
-site/
-  generated/previews/    # 构建生成的封面和低分辨率动画预览
-  examples/
-    manifest.json        # 固定示例清单
-    <pet-id>/
-      pet.json           # 宠物信息和精灵图网格
-      spritesheet.webp   # 原始精灵图
-  index.html             # 静态画廊
-  pets.json              # 构建生成的投稿清单
-  previews.json          # 构建生成的示例预览索引
-  styles.css
-  app.js
-.gallery-cache/          # Actions 复用的预览和校验缓存
-tests/                   # 数据解析测试
-gallery.config.json      # 可迁移的仓库与页面配置
+lib/                    # 构建与前端共用的纯 JS 工具
+scripts/                # Issue 解析和数据生成
+web/
+  public/
+    examples/           # 固定示例宠物
+    generated/previews/ # 构建生成的封面与预览条
+    photo-booth/        # 合影背景（可选图片资源）
+    pets.json           # 构建生成
+    previews.json
+    gallery.config.json
+  src/                  # Preact 前端源码
+dist/                   # vite build 产物（Pages 部署目录）
+.gallery-cache/         # Actions 复用的预览缓存
+tests/
+gallery.config.json
 ```
 
-新增固定示例时，复制一个 `site/examples/<pet-id>/` 目录并把 `<pet-id>` 加入 `site/examples/manifest.json`。建议在 `pet.json` 中完整描述精灵图列数、行数、默认状态，以及每种状态的行号、帧数和播放间隔；省略这些字段时，画廊会按 Codex 宠物的基础九状态和图片实际尺寸补齐。不要把学员投稿文件提交到 `site/examples/`；真实投稿只存在于 Issue 和每次部署生成的 `pets.json` 中。
+新增固定示例时，复制 `web/public/examples/<pet-id>/` 并把 `<pet-id>` 加入 `manifest.json`。不要把学员投稿提交到 examples；真实投稿只存在于 Issue 与每次部署生成的 `pets.json`。
+
+## 前端能力
+
+- 产品级图鉴布局：sticky 顶栏与筛选条、信息完整卡片、动画优先详情
+- 卡片密度三档（舒适 / 标准 / 紧凑），偏好写入 localStorage
+- 分享深链：`?pet=example-bananacat` 或 `?pet=issue-12`，详情内可复制链接
+- 合影：自由多选 + 按组加入（1–33），最多 12 只；预设渐变背景；使用**同源 poster** 合成并导出 PNG（避免跨域 canvas 污染）
 
 ## 精灵图兼容
-
-画廊根据图片实际尺寸自动识别两版 Codex 宠物精灵图：
 
 | 版本 | 网格 | 图片尺寸 | 当前展示范围 |
 | --- | --- | --- | --- |
 | v1 | 8×9 | 1536×1872 | 九行基础状态 |
 | v2 | 8×11 | 1536×2288 | 前九行基础状态 |
 
-两版的单帧都是 192×208。v2 末两行的 16 方位注视动画会被保留在原始文件中，但当前基础画廊不把它们加入状态选择器。即使 `pet.json` 没有声明版本，浏览器也会用 `spritesheet.webp` 的实际尺寸识别 v1 或 v2。
+单帧 192×208。v2 末两行方位注视不进入状态选择器。
 
 ## GitHub 仓库设置
 
 1. 创建公开仓库并启用 Issues。
-2. 创建名为 `pet-submission` 的标签。Issue Form 引用的标签必须预先存在。
-3. 推送本项目到 `main` 分支。
-4. 在仓库的 Pages 设置中把来源设为 **GitHub Actions**。
-5. 打开一次“提交我的宠物”表单，建议在所属分组中只填写 1-33 的数字，再通过专用附件控件上传 `pet.json` 和 `spritesheet.webp`，确认两个文件都完成后再提交。
+2. 创建 `pet-submission` 标签。
+3. 推送到 `main`。
+4. Pages 来源设为 **GitHub Actions**。
+5. 通过「提交我的宠物」表单投稿。
 
-工作流监听投稿 Issue 的编辑、删除、关闭、重新打开和标签变化，也可以手动运行。新投稿由 Issue Form 自动添加的 `pet-submission` 标签触发一次构建；同一时间发生连续变化时只保留最新一次 Pages 部署。关闭 Issue 会从画廊撤回宠物，重新打开会恢复，管理员永久删除 Issue 也会移除对应宠物。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，以有限并发下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。校验成功后会生成封面和默认状态动画预览，并通过 Actions 缓存复用没有变化的结果。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
+工作流：`npm ci` → 生成画廊数据/预览 → `vite build` → 上传 `dist/`。预览图仍走 Actions cache；前端构建通常只需数秒。
 
 ## 投稿有效条件
 
-投稿必须同时满足：
-
-- Issue 处于开启状态，并带有 `pet-submission` 标签；
-- Issue 标题中填写了宠物名，学员昵称和一句话介绍不为空；
-- 所属分组可以留空；填写时只接受 1-33 的数字，展示时统一显示为“第 N 组”，并可用于搜索与筛选；
-- 同时上传了名为 `pet.json` 和 `spritesheet.webp` 的 GitHub 附件；
-- `spritesheet.webp` 是有效 WebP，尺寸为 v1 的 1536×1872 或 v2 的 1536×2288，且不超过 10 MB；
-- 已勾选公开展示确认；
-- Issue 不是 Pull Request。
-
-不符合条件的 Issue 会被忽略，不会导致整个画廊构建失败。投稿内容在页面中始终以纯文本渲染。
+- Issue 开启且带 `pet-submission`
+- 标题含宠物名，昵称与介绍非空
+- 分组可空；填写时仅 1–33
+- 具名附件 `pet.json` + `spritesheet.webp`（GitHub 托管）
+- WebP 尺寸 v1/v2 合法且 ≤10 MB
+- 已勾选公开展示确认
 
 ## 迁移到正式仓库
 
-原型验证后，复制 `.github/ISSUE_TEMPLATE/`、`.github/workflows/`、`scripts/`、`site/`、`gallery.config.json`、`package.json` 和 `package-lock.json`。修改 `gallery.config.json` 中的仓库地址和页面文案，并确认正式仓库中已创建同名投稿标签；页面代码不需要绑定个人仓库地址。
+复制 `.github/`、`lib/`、`scripts/`、`web/`、`gallery.config.json`、`package.json`、`package-lock.json` 与 `tests/`。修改 `gallery.config.json` 中的仓库地址与文案即可。

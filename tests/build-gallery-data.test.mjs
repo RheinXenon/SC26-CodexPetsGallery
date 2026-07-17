@@ -17,14 +17,14 @@ import {
 import {
   normalizeSpriteGrid,
   resolveSpriteLayout,
-} from "../site/sprite-format.js";
+} from "../lib/sprite-format.js";
 import {
   GROUP_COUNT,
   KNOWN_GROUPS,
   matchesGroup,
   matchesSearch,
   normalizeGroupNumber,
-} from "../site/gallery-filter.js";
+} from "../lib/gallery-filter.js";
 
 const validBody = ({ nickname = "阿澈", group = "3", suffix = "one" } = {}) => `### 学员昵称
 ${nickname}
@@ -209,7 +209,7 @@ test("同一账号只保留最近更新的有效投稿", () => {
 test("标准 WebP 精灵图通过校验后会生成安全配置", async () => {
   const submission = parseSubmission(issue());
   const spritesheet = await readFile(
-    new URL("../site/examples/bananacat/spritesheet.webp", import.meta.url),
+    new URL("../web/public/examples/bananacat/spritesheet.webp", import.meta.url),
   );
   const hydrated = await hydrateSubmission(submission, {
     fetchImpl: async (url) => {
@@ -234,7 +234,7 @@ test("WebP 头可以识别 v2 精灵图尺寸", () => {
 
 test("同一账号的最新附件无效时会回退到较早的有效投稿", async () => {
   const spritesheet = await readFile(
-    new URL("../site/examples/bananacat/spritesheet.webp", import.meta.url),
+    new URL("../web/public/examples/bananacat/spritesheet.webp", import.meta.url),
   );
   const older = issue({ number: 1, updated_at: "2026-07-16T08:00:00Z" });
   const newer = issue({
@@ -257,7 +257,7 @@ test("三个示例宠物都使用完整且不越界的精灵图状态配置", as
   const ids = ["bananacat", "hachiroku", "oiiai"];
 
   for (const id of ids) {
-    const content = await readFile(new URL(`../site/examples/${id}/pet.json`, import.meta.url), "utf8");
+    const content = await readFile(new URL(`../web/public/examples/${id}/pet.json`, import.meta.url), "utf8");
     const pet = JSON.parse(content);
     const grid = pet.spriteGrid;
 

@@ -1,7 +1,12 @@
+web/public/pets.json
+web/public/gallery.config.json
+web/public/previews.json
+web/public/generated/
 site/pets.json
 site/gallery.config.json
 site/previews.json
 site/generated/
+dist/
 .gallery-cache/
 node_modules/
 .playwright/

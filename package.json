@@ -1,15 +1,26 @@
 {
   "name": "sc26-codex-pets-gallery",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "preview": "vite preview --config web/vite.config.ts",
     "build:data": "node scripts/build-gallery-data.mjs",
     "build:data:empty": "node scripts/build-gallery-data.mjs --empty",
     "test": "node tests/build-gallery-data.test.mjs"
   },
   "dependencies": {
+    "preact": "^10.26.9",
     "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "@tailwindcss/vite": "^4.1.11",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.4"
   },
   "engines": {
     "node": ">=20"
