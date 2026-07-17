@@ -1,0 +1,14 @@
+{
+  "name": "sc26-codex-pets-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:data": "node scripts/build-gallery-data.mjs",
+    "build:data:empty": "node scripts/build-gallery-data.mjs --empty",
+    "test": "node tests/build-gallery-data.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

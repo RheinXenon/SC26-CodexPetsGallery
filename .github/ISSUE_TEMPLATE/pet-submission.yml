@@ -1,0 +1,53 @@
+name: 提交我的宠物
+description: 将你的宠物展示到 SummerCamp 2026 宠物画廊
+title: "[宠物投稿] "
+labels:
+  - pet-submission
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请上传一张展示图和一个 ZIP 宠物包。提交后约 1–3 分钟会出现在画廊中。
+
+  - type: input
+    id: pet-name
+    attributes:
+      label: 宠物名
+      placeholder: 例如：香蕉猫
+    validations:
+      required: true
+
+  - type: input
+    id: nickname
+    attributes:
+      label: 学员昵称
+      description: 画廊中公开显示的名字
+      placeholder: 例如：小明
+    validations:
+      required: true
+
+  - type: textarea
+    id: preview
+    attributes:
+      label: 展示图
+      description: 将 PNG、GIF 或 WebP 图片拖到这里，等待上传完成后再提交。
+      placeholder: 把展示图拖到这里
+    validations:
+      required: true
+
+  - type: textarea
+    id: package
+    attributes:
+      label: 宠物 ZIP 包
+      description: 将 ZIP 文件拖到这里。画廊只提供下载，不会解析或运行其中内容。
+      placeholder: 把 ZIP 文件拖到这里
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: 公开展示确认
+      options:
+        - label: 我确认该作品可以在公开画廊中展示，并同意公开以上信息和文件。
+          required: true

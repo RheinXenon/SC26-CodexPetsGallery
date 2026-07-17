@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SummerCamp 2026 学员宠物作品画廊">
+    <title>SC26 宠物画廊</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="./" aria-label="返回宠物画廊首页">
+          <span class="brand-mark" aria-hidden="true">SC26</span>
+          <span id="page-title">宠物画廊</span>
+        </a>
+        <a class="submit-button" id="submit-link" href="#" target="_blank" rel="noreferrer">
+          提交我的宠物 <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section class="gallery-heading" aria-labelledby="gallery-title">
+        <div>
+          <p class="eyebrow" id="event-name">SummerCamp 2026</p>
+          <h1 id="gallery-title">大家的宠物</h1>
+        </div>
+        <p class="submission-count"><strong id="submission-count">0</strong> 份学员作品</p>
+      </section>
+
+      <div class="status-message" id="status-message" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="status-text">正在叫醒宠物……</span>
+      </div>
+
+      <section aria-label="宠物作品">
+        <div class="gallery-grid" id="gallery" aria-live="polite" aria-busy="true"></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>SC26 宠物画廊</span>
+      <span id="updated-at"></span>
+    </footer>
+
+    <dialog class="detail-dialog" id="detail-dialog" aria-labelledby="detail-title">
+      <button class="dialog-close" id="dialog-close" type="button" aria-label="关闭详情" title="关闭">×</button>
+      <div class="detail-shell">
+        <header class="detail-header">
+          <p class="detail-kind" id="detail-kind"></p>
+          <h2 id="detail-title"></h2>
+          <p class="detail-author" id="detail-author"></p>
+          <p class="detail-description" id="detail-description"></p>
+        </header>
+
+        <div class="state-viewer" id="state-viewer" hidden>
+          <section class="active-state-panel" aria-labelledby="active-state-name">
+            <div class="state-panel-heading">
+              <div>
+                <span class="state-eyebrow">当前状态</span>
+                <h3 id="active-state-name"></h3>
+              </div>
+              <span class="frame-count" id="active-state-count"></span>
+            </div>
+            <div class="detail-preview" id="detail-preview"></div>
+            <p class="active-state-description" id="active-state-description"></p>
+          </section>
+          <div class="state-list" id="state-list" aria-label="选择宠物状态"></div>
+        </div>
+
+        <div class="submission-preview" id="submission-preview" hidden></div>
+        <div class="detail-links" id="detail-links"></div>
+      </div>
+    </dialog>
+
+    <template id="pet-card-template">
+      <button class="pet-card" type="button">
+        <span class="pet-preview"></span>
+        <span class="pet-body">
+          <span class="pet-label"></span>
+          <strong class="pet-name"></strong>
+          <span class="pet-byline"></span>
+        </span>
+      </button>
+    </template>
+  </body>
+</html>

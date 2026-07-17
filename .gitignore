@@ -1,0 +1,4 @@
+site/pets.json
+site/gallery.config.json
+.playwright/
+*.log
