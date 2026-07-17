@@ -2,7 +2,7 @@ name: Build and deploy gallery
 
 on:
   issues:
-    types: [opened, edited, closed, reopened]
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
   workflow_dispatch:
   push:
     branches: [main]
@@ -24,7 +24,6 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'pet-submission')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
