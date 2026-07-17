@@ -70,6 +70,24 @@ test("宠物文件必须同时包含具名的 pet.json 和 spritesheet.webp", ()
   assert.equal(extractPetAttachments("![other](https://github.com/user-attachments/assets/one)"), null);
 });
 
+test("兼容 GitHub 将 WebP 附件写成 HTML 图片的实际 Issue 内容", () => {
+  assert.deepEqual(extractPetAttachments(`
+<img width="1536" height="1872" alt="Image" src="https://github.com/user-attachments/assets/sprite-id" />
+[pet.json](https://github.com/user-attachments/files/30125974/pet.json)
+`), {
+    petConfigUrl: "https://github.com/user-attachments/files/30125974/pet.json",
+    spritesheetUrl: "https://github.com/user-attachments/assets/sprite-id",
+  });
+});
+
+test("有多张未具名图片时不猜测哪一张是精灵图", () => {
+  assert.equal(extractPetAttachments(`
+<img alt="Image" src="https://github.com/user-attachments/assets/first" />
+<img alt="Image" src="https://github.com/user-attachments/assets/second" />
+[pet.json](https://github.com/user-attachments/files/one/pet.json)
+`), null);
+});
+
 test("有效投稿会转成公开画廊数据", () => {
   assert.deepEqual(parseSubmission(issue()), {
     issueNumber: 7,
@@ -125,6 +143,39 @@ test("pet.json 通过校验后会补齐精灵图配置", async () => {
   assert.equal(hydrated.petId, "spark");
   assert.equal(hydrated.spriteGrid.columns, 8);
   assert.equal(hydrated.spriteGrid.states.length, 9);
+});
+
+test("读取 GitHub pet.json 附件时会使用 Actions 令牌", async () => {
+  const submission = parseSubmission(issue());
+  let requestHeaders;
+  await hydrateSubmission(submission, {
+    token: "test-token",
+    fetchImpl: async (_url, options) => {
+      requestHeaders = options.headers;
+      return {
+        ok: true,
+        headers: { get: () => "120" },
+        text: async () => JSON.stringify({ id: "spark", spritesheetPath: "spritesheet.webp" }),
+      };
+    },
+  });
+
+  assert.equal(requestHeaders.Authorization, "Bearer test-token");
+});
+
+test("Actions 令牌不会发送给 GitHub 附件域名之外的地址", async () => {
+  let requestHeaders;
+  await hydrateSubmission({
+    petConfigUrl: "https://example.com/pet.json",
+  }, {
+    token: "test-token",
+    fetchImpl: async (_url, options) => {
+      requestHeaders = options.headers;
+      return { ok: false };
+    },
+  });
+
+  assert.equal(requestHeaders.Authorization, undefined);
 });
 
 test("同一账号的最新附件无效时会回退到较早的有效投稿", async () => {

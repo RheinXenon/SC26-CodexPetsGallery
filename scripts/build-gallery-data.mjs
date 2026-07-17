@@ -49,9 +49,29 @@ export function extractAllowedUrl(value = "") {
 }
 
 export function extractPetAttachments(value = "") {
-  const links = [...value.matchAll(/(!?)\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g)]
+  const markdownLinks = [...value.matchAll(/(!?)\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g)]
+    .map((match) => ({
+      isImage: match[1] === "!",
+      name: match[2].trim(),
+      url: match[3],
+    }));
+  const htmlImages = [...value.matchAll(/<img\b[^>]*>/gi)]
     .map((match) => {
-      const url = match[3];
+      const attributes = new Map();
+      for (const attribute of match[0].matchAll(
+        /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi,
+      )) {
+        attributes.set(attribute[1].toLowerCase(), attribute[2] ?? attribute[3] ?? attribute[4]);
+      }
+      return {
+        isImage: true,
+        name: attributes.get("alt") ?? "",
+        url: attributes.get("src") ?? "",
+      };
+    });
+  const links = [...markdownLinks, ...htmlImages]
+    .map((link) => {
+      const { url } = link;
       if (!isAllowedGithubAttachment(url)) return null;
 
       let pathName = "";
@@ -61,8 +81,8 @@ export function extractPetAttachments(value = "") {
         return null;
       }
       return {
-        isImage: match[1] === "!",
-        name: match[2].trim().toLowerCase(),
+        isImage: link.isImage,
+        name: link.name.toLowerCase(),
         pathName,
         url,
       };
@@ -77,7 +97,10 @@ export function extractPetAttachments(value = "") {
     link.name === "spritesheet.webp"
     || link.name === "spritesheet"
     || link.pathName.endsWith("/spritesheet.webp")
-  ));
+  )) ?? (() => {
+    const unnamedImages = links.filter((link) => link.isImage && link.url !== config?.url);
+    return unnamedImages.length === 1 ? unnamedImages[0] : null;
+  })();
 
   if (!config || !spritesheet || config.url === spritesheet.url) return null;
   return {
@@ -146,10 +169,14 @@ function sanitizeSpriteGrid(value) {
   };
 }
 
-export async function hydrateSubmission(submission, { fetchImpl = fetch } = {}) {
+export async function hydrateSubmission(submission, { fetchImpl = fetch, token } = {}) {
   try {
+    const headers = { Accept: "application/json" };
+    if (token && isAllowedGithubAttachment(submission.petConfigUrl)) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     const response = await fetchImpl(submission.petConfigUrl, {
-      headers: { Accept: "application/json" },
+      headers,
     });
     if (!response.ok) return null;
 
@@ -190,7 +217,10 @@ export function selectLatestSubmissions(issues) {
   return [...latestByAccount.values()];
 }
 
-export async function selectLatestValidSubmissions(issues, { fetchImpl = fetch } = {}) {
+export async function selectLatestValidSubmissions(
+  issues,
+  { fetchImpl = fetch, token, onRejected = () => {} } = {},
+) {
   const latestByAccount = new Map();
   const sorted = [...issues].sort(
     (left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at),
@@ -198,9 +228,20 @@ export async function selectLatestValidSubmissions(issues, { fetchImpl = fetch }
 
   for (const issue of sorted) {
     const candidate = parseSubmission(issue);
-    if (!candidate || latestByAccount.has(candidate.githubLogin)) continue;
-    const submission = await hydrateSubmission(candidate, { fetchImpl });
-    if (submission) latestByAccount.set(submission.githubLogin, submission);
+    if (!candidate) {
+      onRejected(issue, "表单字段、附件或公开展示确认不完整");
+      continue;
+    }
+    if (latestByAccount.has(candidate.githubLogin)) {
+      onRejected(issue, "同一账号已有更新的有效投稿");
+      continue;
+    }
+    const submission = await hydrateSubmission(candidate, { fetchImpl, token });
+    if (submission) {
+      latestByAccount.set(submission.githubLogin, submission);
+    } else {
+      onRejected(issue, "pet.json 无法读取或未通过格式校验");
+    }
   }
 
   return [...latestByAccount.values()];
@@ -258,9 +299,15 @@ export async function buildGalleryData({
     token,
     fetchImpl,
   });
+  const rejected = [];
+  const pets = await selectLatestValidSubmissions(issues, {
+    fetchImpl,
+    token,
+    onRejected: (issue, reason) => rejected.push({ number: issue.number, reason }),
+  });
   const data = {
     generatedAt: new Date().toISOString(),
-    pets: await selectLatestValidSubmissions(issues, { fetchImpl }),
+    pets,
   };
   const siteDir = path.join(rootDir, "site");
 
@@ -269,6 +316,11 @@ export async function buildGalleryData({
     path.join(siteDir, "gallery.config.json"),
     `${JSON.stringify({ ...config, repository: targetRepository }, null, 2)}\n`,
   );
+
+  console.log(`读取到 ${issues.length} 条投稿 Issue，接受 ${pets.length} 条，忽略 ${rejected.length} 条。`);
+  for (const item of rejected) {
+    console.warn(`忽略投稿 #${item.number}：${item.reason}`);
+  }
 
   return data;
 }
