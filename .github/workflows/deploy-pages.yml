@@ -2,7 +2,7 @@ name: Build and deploy gallery
 
 on:
   issues:
-    types: [opened, edited, closed, reopened, labeled, unlabeled]
+    types: [edited, deleted, closed, reopened, labeled, unlabeled]
   workflow_dispatch:
   push:
     branches: [main]
@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:

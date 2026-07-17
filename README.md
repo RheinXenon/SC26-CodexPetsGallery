@@ -65,7 +65,7 @@ gallery.config.json      # 可迁移的仓库与页面配置
 4. 在仓库的 Pages 设置中把来源设为 **GitHub Actions**。
 5. 打开一次“提交我的宠物”表单，通过专用附件控件上传 `pet.json` 和 `spritesheet.webp`，确认两个文件都完成后再提交。
 
-工作流监听投稿 Issue 的新建、编辑、关闭和重新打开，也可以手动运行。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
+工作流监听投稿 Issue 的编辑、删除、关闭、重新打开和标签变化，也可以手动运行。新投稿由 Issue Form 自动添加的 `pet-submission` 标签触发一次构建；同一时间发生连续变化时只保留最新一次 Pages 部署。关闭 Issue 会从画廊撤回宠物，重新打开会恢复，管理员永久删除 Issue 也会移除对应宠物。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
 
 ## 投稿有效条件
 
