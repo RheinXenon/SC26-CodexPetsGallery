@@ -2,19 +2,20 @@
 
 这是 SummerCamp 2026 学员宠物画廊的个人仓库原型。学员通过 GitHub Issue Form 投稿，GitHub Actions 汇总有效投稿并部署静态页面；页面始终展示三个示例宠物，示例不计入投稿数量。
 
-示例宠物直接保留原始 `spritesheet.webp`。浏览器根据安全的标准网格配置，用 Canvas 裁切并播放各行帧动画；项目不会在构建时生成缩略图或动画文件，也没有处理图片的后端服务。
+示例宠物直接保留原始 `spritesheet.webp`。构建脚本在校验完整精灵图时，同时生成默认状态封面和低分辨率动画预览；画廊列表懒加载这些轻量资源，只在宠物进入可视区域时播放预览，打开详情后才读取完整精灵图。页面支持按宠物名、作者和介绍搜索，并按每页 40 只分页展示。所有图片处理都在 GitHub Actions 构建阶段完成，不需要后端图片服务。
 
 ## 本地预览
 
 需要 Node.js 20 或更高版本，以及任意可用的静态文件服务器。
 
 ```powershell
+npm install
 npm test
 npm run build:data:empty
 D:\miniconda3\envs\daily\python.exe -m http.server 4173 --directory site
 ```
 
-然后访问 `http://localhost:4173/`。`build:data:empty` 只会生成被 Git 忽略的 `site/pets.json` 和运行时配置，用来模拟“尚无真实投稿”的状态。
+然后访问 `http://localhost:4173/`。`build:data:empty` 会生成被 Git 忽略的 `site/pets.json`、运行时配置、示例预览索引和预览图片，用来模拟“尚无真实投稿”的状态。
 
 如需在本地读取真实 Issue，先设置只读范围的 GitHub Token：
 
@@ -32,14 +33,18 @@ npm run build:data
   workflows/            # Pages 构建与部署
 scripts/                 # Issue 解析和数据生成
 site/
+  generated/previews/    # 构建生成的封面和低分辨率动画预览
   examples/
     manifest.json        # 固定示例清单
     <pet-id>/
       pet.json           # 宠物信息和精灵图网格
       spritesheet.webp   # 原始精灵图
   index.html             # 静态画廊
+  pets.json              # 构建生成的投稿清单
+  previews.json          # 构建生成的示例预览索引
   styles.css
   app.js
+.gallery-cache/          # Actions 复用的预览和校验缓存
 tests/                   # 数据解析测试
 gallery.config.json      # 可迁移的仓库与页面配置
 ```
@@ -65,7 +70,7 @@ gallery.config.json      # 可迁移的仓库与页面配置
 4. 在仓库的 Pages 设置中把来源设为 **GitHub Actions**。
 5. 打开一次“提交我的宠物”表单，通过专用附件控件上传 `pet.json` 和 `spritesheet.webp`，确认两个文件都完成后再提交。
 
-工作流监听投稿 Issue 的编辑、删除、关闭、重新打开和标签变化，也可以手动运行。新投稿由 Issue Form 自动添加的 `pet-submission` 标签触发一次构建；同一时间发生连续变化时只保留最新一次 Pages 部署。关闭 Issue 会从画廊撤回宠物，重新打开会恢复，管理员永久删除 Issue 也会移除对应宠物。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
+工作流监听投稿 Issue 的编辑、删除、关闭、重新打开和标签变化，也可以手动运行。新投稿由 Issue Form 自动添加的 `pet-submission` 标签触发一次构建；同一时间发生连续变化时只保留最新一次 Pages 部署。关闭 Issue 会从画廊撤回宠物，重新打开会恢复，管理员永久删除 Issue 也会移除对应宠物。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，以有限并发下载并校验不超过 10 MB 的 `spritesheet.webp`，然后按 GitHub 账号保留最近更新的一条有效投稿。校验成功后会生成封面和默认状态动画预览，并通过 Actions 缓存复用没有变化的结果。`pet.json` 作为原始作品文件保留链接，但不会成为构建依赖；画廊根据精灵图尺寸生成安全的标准网格配置，不会执行投稿文件中的代码。
 
 ## 投稿有效条件
 
@@ -82,4 +87,4 @@ gallery.config.json      # 可迁移的仓库与页面配置
 
 ## 迁移到正式仓库
 
-原型验证后，复制 `.github/ISSUE_TEMPLATE/`、`.github/workflows/`、`scripts/`、`site/` 和 `gallery.config.json`。修改 `gallery.config.json` 中的仓库地址和页面文案，并确认正式仓库中已创建同名投稿标签；页面代码不需要绑定个人仓库地址。
+原型验证后，复制 `.github/ISSUE_TEMPLATE/`、`.github/workflows/`、`scripts/`、`site/`、`gallery.config.json`、`package.json` 和 `package-lock.json`。修改 `gallery.config.json` 中的仓库地址和页面文案，并确认正式仓库中已创建同名投稿标签；页面代码不需要绑定个人仓库地址。

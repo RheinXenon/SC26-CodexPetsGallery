@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SummerCamp 2026 学员宠物作品画廊">
     <title>SC26 宠物画廊</title>
-    <link rel="stylesheet" href="styles.css">
-    <script type="module" src="app.js"></script>
+    <link rel="stylesheet" href="styles.css?v=20260717-4">
+    <script type="module" src="app.js?v=20260717-4"></script>
   </head>
   <body>
     <header class="site-header">
@@ -30,6 +30,19 @@
         <p class="submission-count"><strong id="submission-count">0</strong> 份学员作品</p>
       </section>
 
+      <section class="gallery-tools" id="gallery-tools" aria-label="筛选宠物作品">
+        <label class="search-field" for="gallery-search">
+          <span class="search-label">搜索</span>
+          <input
+            id="gallery-search"
+            type="search"
+            placeholder="宠物名、作者或介绍"
+            autocomplete="off"
+          >
+        </label>
+        <p class="result-summary" id="result-summary" aria-live="polite"></p>
+      </section>
+
       <div class="status-message" id="status-message" role="status">
         <span class="status-dot" aria-hidden="true"></span>
         <span id="status-text">正在叫醒宠物……</span>
@@ -37,6 +50,12 @@
 
       <section aria-label="宠物作品">
         <div class="gallery-grid" id="gallery" aria-live="polite" aria-busy="true"></div>
+        <p class="empty-results" id="empty-results" hidden>没有找到匹配的宠物。</p>
+        <nav class="pagination" id="pagination" aria-label="画廊分页" hidden>
+          <button class="page-arrow" id="previous-page" type="button" aria-label="上一页" title="上一页">←</button>
+          <div class="page-numbers" id="page-numbers"></div>
+          <button class="page-arrow" id="next-page" type="button" aria-label="下一页" title="下一页">→</button>
+        </nav>
       </section>
     </main>
 
@@ -80,6 +99,7 @@
         <span class="pet-body">
           <span class="pet-label"></span>
           <strong class="pet-name"></strong>
+          <span class="pet-description"></span>
           <span class="pet-byline"></span>
         </span>
       </button>

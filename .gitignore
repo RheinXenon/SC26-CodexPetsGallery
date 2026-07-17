@@ -1,4 +1,8 @@
 site/pets.json
 site/gallery.config.json
+site/previews.json
+site/generated/
+.gallery-cache/
+node_modules/
 .playwright/
 *.log

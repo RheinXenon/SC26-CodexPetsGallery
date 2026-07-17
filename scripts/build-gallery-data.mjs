@@ -1,6 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import sharp from "sharp";
 import { normalizeSpriteGrid, validateSpriteGrid } from "../site/sprite-format.js";
 
 const FIELD_LABELS = {
@@ -12,6 +14,10 @@ const FIELD_LABELS = {
 
 const PET_TITLE_PREFIX = "[宠物投稿]";
 const MAX_SPRITE_BYTES = 10 * 1024 * 1024;
+const PREVIEW_PIPELINE_VERSION = "v1";
+const PREVIEW_FRAME_WIDTH = 96;
+const PREVIEW_FRAME_HEIGHT = 104;
+const DEFAULT_BUILD_CONCURRENCY = 4;
 const EXPECTED_SPRITE_FORMATS = new Map([
   ["1536x1872", { formatVersion: "v1", rows: 9 }],
   ["1536x2288", { formatVersion: "v2", rows: 11 }],
@@ -195,8 +201,122 @@ export function readWebpDimensions(source) {
   return null;
 }
 
-export async function hydrateSubmission(submission, { fetchImpl = fetch } = {}) {
+async function fileExists(filePath) {
   try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getDefaultState(spriteGrid) {
+  return spriteGrid.states.find((state) => state.id === spriteGrid.defaultState)
+    ?? spriteGrid.states[0];
+}
+
+function previewFileName(petId, digest, kind) {
+  const safeId = String(petId).replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "pet";
+  return `${safeId}-${digest}-${kind}.webp`;
+}
+
+async function materializePreviewAssets(rootDir, previewAssets) {
+  if (!previewAssets?.posterUrl || !previewAssets?.previewUrl) return false;
+
+  const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
+  const publishedDir = path.join(rootDir, "site", "generated", "previews");
+  const posterName = path.posix.basename(previewAssets.posterUrl);
+  const previewName = path.posix.basename(previewAssets.previewUrl);
+  const cachedPoster = path.join(cacheDir, posterName);
+  const cachedPreview = path.join(cacheDir, previewName);
+  if (!await fileExists(cachedPoster) || !await fileExists(cachedPreview)) return false;
+
+  await mkdir(publishedDir, { recursive: true });
+  await Promise.all([
+    copyFile(cachedPoster, path.join(publishedDir, posterName)),
+    copyFile(cachedPreview, path.join(publishedDir, previewName)),
+  ]);
+  return true;
+}
+
+export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir }) {
+  const dimensions = readWebpDimensions(source);
+  const defaultState = getDefaultState(spriteGrid);
+  if (!dimensions || !defaultState) throw new Error("无法生成精灵图预览");
+
+  const frameWidth = dimensions.width / spriteGrid.columns;
+  const frameHeight = dimensions.height / spriteGrid.rows;
+  if (!Number.isInteger(frameWidth) || !Number.isInteger(frameHeight)) {
+    throw new Error("精灵图尺寸与网格配置不匹配");
+  }
+
+  const digest = createHash("sha256")
+    .update(PREVIEW_PIPELINE_VERSION)
+    .update(source)
+    .digest("hex")
+    .slice(0, 16);
+  const posterName = previewFileName(petId, digest, "poster");
+  const previewName = previewFileName(petId, digest, "preview");
+  const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
+  const cachedPoster = path.join(cacheDir, posterName);
+  const cachedPreview = path.join(cacheDir, previewName);
+  await mkdir(cacheDir, { recursive: true });
+
+  const top = defaultState.row * frameHeight;
+  const posterTask = fileExists(cachedPoster).then((exists) => (
+    exists
+      ? null
+      : sharp(source)
+        .extract({ left: 0, top, width: frameWidth, height: frameHeight })
+        .webp({ lossless: true, effort: 6 })
+        .toFile(cachedPoster)
+  ));
+  const previewTask = fileExists(cachedPreview).then((exists) => (
+    exists
+      ? null
+      : sharp(source)
+        .extract({
+          left: 0,
+          top,
+          width: defaultState.frames * frameWidth,
+          height: frameHeight,
+        })
+        .resize({
+          width: defaultState.frames * PREVIEW_FRAME_WIDTH,
+          height: PREVIEW_FRAME_HEIGHT,
+          fit: "fill",
+          kernel: sharp.kernel.nearest,
+        })
+        .webp({ lossless: true, effort: 6 })
+        .toFile(cachedPreview)
+  ));
+  await Promise.all([posterTask, previewTask]);
+
+  const previewAssets = {
+    posterUrl: `generated/previews/${posterName}`,
+    previewUrl: `generated/previews/${previewName}`,
+    previewFrameWidth: PREVIEW_FRAME_WIDTH,
+    previewFrameHeight: PREVIEW_FRAME_HEIGHT,
+  };
+  await materializePreviewAssets(rootDir, previewAssets);
+  return previewAssets;
+}
+
+export async function hydrateSubmission(submission, {
+  fetchImpl = fetch,
+  getCachedMedia,
+  createPreviewAssets,
+} = {}) {
+  try {
+    const cachedMedia = await getCachedMedia?.(submission);
+    if (cachedMedia) {
+      return {
+        ...submission,
+        petId: `issue-${submission.issueNumber}`,
+        ...cachedMedia,
+      };
+    }
+
     const response = await fetchImpl(submission.spritesheetUrl, {
       headers: { Accept: "image/webp" },
     });
@@ -219,10 +339,17 @@ export async function hydrateSubmission(submission, { fetchImpl = fetch } = {}) 
     });
     if (!validateSpriteGrid(spriteGrid)) return null;
 
+    const previewAssets = await createPreviewAssets?.({
+      source,
+      petId: `issue-${submission.issueNumber}`,
+      spriteGrid,
+      submission,
+    }) ?? {};
     return {
       ...submission,
       petId: `issue-${submission.issueNumber}`,
       spriteGrid,
+      ...previewAssets,
     };
   } catch {
     return null;
@@ -246,12 +373,18 @@ export function selectLatestSubmissions(issues) {
 
 export async function selectLatestValidSubmissions(
   issues,
-  { fetchImpl = fetch, onRejected = () => {} } = {},
+  {
+    fetchImpl = fetch,
+    onRejected = () => {},
+    getCachedMedia,
+    createPreviewAssets,
+    concurrency = DEFAULT_BUILD_CONCURRENCY,
+  } = {},
 ) {
-  const latestByAccount = new Map();
   const sorted = [...issues].sort(
     (left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at),
   );
+  const candidatesByAccount = new Map();
 
   for (const issue of sorted) {
     const candidate = parseSubmission(issue);
@@ -259,19 +392,84 @@ export async function selectLatestValidSubmissions(
       onRejected(issue, "表单字段、附件或公开展示确认不完整");
       continue;
     }
-    if (latestByAccount.has(candidate.githubLogin)) {
-      onRejected(issue, "同一账号已有更新的有效投稿");
-      continue;
-    }
-    const submission = await hydrateSubmission(candidate, { fetchImpl });
-    if (submission) {
-      latestByAccount.set(submission.githubLogin, submission);
-    } else {
-      onRejected(issue, "spritesheet.webp 无法读取、超过 10 MB 或尺寸不符合 v1/v2 标准");
-    }
+    const accountCandidates = candidatesByAccount.get(candidate.githubLogin) ?? [];
+    accountCandidates.push({ issue, candidate });
+    candidatesByAccount.set(candidate.githubLogin, accountCandidates);
   }
 
-  return [...latestByAccount.values()];
+  const groups = [...candidatesByAccount.values()];
+  let nextGroup = 0;
+  const selected = new Array(groups.length).fill(null);
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), groups.length) },
+    async () => {
+      for (;;) {
+        const groupIndex = nextGroup;
+        nextGroup += 1;
+        if (groupIndex >= groups.length) return;
+
+        let accepted = false;
+        for (const { issue, candidate } of groups[groupIndex]) {
+          if (accepted) {
+            onRejected(issue, "同一账号已有更新的有效投稿");
+            continue;
+          }
+          const submission = await hydrateSubmission(candidate, {
+            fetchImpl,
+            getCachedMedia,
+            createPreviewAssets,
+          });
+          if (submission) {
+            selected[groupIndex] = submission;
+            accepted = true;
+          } else {
+            onRejected(issue, "spritesheet.webp 无法读取、超过 10 MB、尺寸不符合标准或预览生成失败");
+          }
+        }
+      }
+    },
+  );
+  await Promise.all(workers);
+  return selected.filter(Boolean);
+}
+
+async function loadPreviewCache(rootDir) {
+  const cachePath = path.join(rootDir, ".gallery-cache", "preview-cache.json");
+  try {
+    const data = JSON.parse(await readFile(cachePath, "utf8"));
+    if (data.version === PREVIEW_PIPELINE_VERSION && data.entries) return data;
+  } catch {
+    // A missing or stale cache is rebuilt from the source attachments.
+  }
+  return { version: PREVIEW_PIPELINE_VERSION, entries: {} };
+}
+
+async function savePreviewCache(rootDir, cache) {
+  const cacheDir = path.join(rootDir, ".gallery-cache");
+  await mkdir(cacheDir, { recursive: true });
+  await writeFile(
+    path.join(cacheDir, "preview-cache.json"),
+    `${JSON.stringify(cache, null, 2)}\n`,
+  );
+}
+
+async function buildExamplePreviews(rootDir) {
+  const examplesDir = path.join(rootDir, "site", "examples");
+  const ids = JSON.parse(await readFile(path.join(examplesDir, "manifest.json"), "utf8"));
+  const entries = await Promise.all(ids.map(async (id) => {
+    const petDir = path.join(examplesDir, id);
+    const pet = JSON.parse(await readFile(path.join(petDir, "pet.json"), "utf8"));
+    const spriteGrid = normalizeSpriteGrid(pet.spriteGrid);
+    if (!validateSpriteGrid(spriteGrid)) throw new Error(`${id} 的示例精灵图配置无效`);
+    const source = await readFile(path.join(petDir, pet.spritesheetPath));
+    const previewAssets = await generatePreviewAssets(source, {
+      petId: `example-${id}`,
+      spriteGrid,
+      rootDir,
+    });
+    return [id, previewAssets];
+  }));
+  return Object.fromEntries(entries);
 }
 
 async function fetchSubmissionIssues({ repository, label, token, fetchImpl = fetch }) {
@@ -320,6 +518,9 @@ export async function buildGalleryData({
   if (!token) throw new Error("缺少 GITHUB_TOKEN，无法读取投稿 Issue。");
   if (!targetRepository) throw new Error("缺少仓库地址。");
 
+  const previewCache = await loadPreviewCache(rootDir);
+  const examplePreviewsPromise = buildExamplePreviews(rootDir);
+
   const issues = await fetchSubmissionIssues({
     repository: targetRepository,
     label: config.submissionLabel,
@@ -330,7 +531,18 @@ export async function buildGalleryData({
   const pets = await selectLatestValidSubmissions(issues, {
     fetchImpl,
     onRejected: (issue, reason) => rejected.push({ number: issue.number, reason }),
+    getCachedMedia: async (submission) => {
+      const cached = previewCache.entries[submission.spritesheetUrl];
+      if (!cached || !await materializePreviewAssets(rootDir, cached)) return null;
+      return cached;
+    },
+    createPreviewAssets: async ({ source, petId, spriteGrid, submission }) => {
+      const previewAssets = await generatePreviewAssets(source, { petId, spriteGrid, rootDir });
+      previewCache.entries[submission.spritesheetUrl] = { spriteGrid, ...previewAssets };
+      return previewAssets;
+    },
   });
+  const examplePreviews = await examplePreviewsPromise;
   const data = {
     generatedAt: new Date().toISOString(),
     pets,
@@ -339,9 +551,14 @@ export async function buildGalleryData({
 
   await writeFile(path.join(siteDir, "pets.json"), `${JSON.stringify(data, null, 2)}\n`);
   await writeFile(
+    path.join(siteDir, "previews.json"),
+    `${JSON.stringify({ examples: examplePreviews }, null, 2)}\n`,
+  );
+  await writeFile(
     path.join(siteDir, "gallery.config.json"),
     `${JSON.stringify({ ...config, repository: targetRepository }, null, 2)}\n`,
   );
+  await savePreviewCache(rootDir, previewCache);
 
   console.log(`读取到 ${issues.length} 条投稿 Issue，接受 ${pets.length} 条，忽略 ${rejected.length} 条。`);
   for (const item of rejected) {
