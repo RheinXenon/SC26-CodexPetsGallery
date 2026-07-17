@@ -63,17 +63,18 @@ gallery.config.json      # 可迁移的仓库与页面配置
 2. 创建名为 `pet-submission` 的标签。Issue Form 引用的标签必须预先存在。
 3. 推送本项目到 `main` 分支。
 4. 在仓库的 Pages 设置中把来源设为 **GitHub Actions**。
-5. 打开一次“提交我的宠物”表单，确认图片和 ZIP 上传完成后再提交。
+5. 打开一次“提交我的宠物”表单，确认 `pet.json` 和 `spritesheet.webp` 都上传完成后再提交。
 
-工作流监听投稿 Issue 的新建、编辑、关闭和重新打开，也可以手动运行。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，并按 GitHub 账号保留最近更新的一条有效投稿。ZIP 只作为下载链接，不会被解析或执行。
+工作流监听投稿 Issue 的新建、编辑、关闭和重新打开，也可以手动运行。构建脚本分页读取所有开启的 `pet-submission` Issue，只接受 GitHub 托管的附件地址，读取并校验不超过 100 KB 的 `pet.json`，然后按 GitHub 账号保留最近更新的一条有效投稿。精灵图只在浏览器中按帧显示，不会执行投稿文件中的代码。
 
 ## 投稿有效条件
 
 投稿必须同时满足：
 
 - Issue 处于开启状态，并带有 `pet-submission` 标签；
-- 宠物名和学员昵称不为空；
-- 展示图和 ZIP 包使用 GitHub 上传后生成的附件地址；
+- Issue 标题中填写了宠物名，学员昵称和一句话介绍不为空；
+- 同时上传了名为 `pet.json` 和 `spritesheet.webp` 的 GitHub 附件；
+- `pet.json` 是有效 JSON，包含 `id`，并且 `spritesheetPath` 为 `spritesheet.webp`；
 - 已勾选公开展示确认；
 - Issue 不是 Pull Request。
 

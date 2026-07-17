@@ -1,14 +1,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { normalizeSpriteGrid, validateSpriteGrid } from "../site/sprite-format.js";
 
 const FIELD_LABELS = {
-  petName: "宠物名",
   nickname: "学员昵称",
-  preview: "展示图",
-  package: "宠物 ZIP 包",
+  description: "一句话介绍",
+  files: "宠物文件",
   consent: "公开展示确认",
 };
+
+const PET_TITLE_PREFIX = "[宠物投稿]";
+const MAX_CONFIG_BYTES = 100_000;
 
 const ALLOWED_ATTACHMENT_HOSTS = new Set([
   "user-images.githubusercontent.com",
@@ -45,35 +48,131 @@ export function extractAllowedUrl(value = "") {
   return candidates.find(isAllowedGithubAttachment) ?? null;
 }
 
+export function extractPetAttachments(value = "") {
+  const links = [...value.matchAll(/(!?)\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g)]
+    .map((match) => {
+      const url = match[3];
+      if (!isAllowedGithubAttachment(url)) return null;
+
+      let pathName = "";
+      try {
+        pathName = decodeURIComponent(new URL(url).pathname).toLowerCase();
+      } catch {
+        return null;
+      }
+      return {
+        isImage: match[1] === "!",
+        name: match[2].trim().toLowerCase(),
+        pathName,
+        url,
+      };
+    })
+    .filter(Boolean);
+
+  const config = links.find((link) => (
+    link.name === "pet.json"
+    || link.pathName.endsWith("/pet.json")
+  ));
+  const spritesheet = links.find((link) => (
+    link.name === "spritesheet.webp"
+    || link.name === "spritesheet"
+    || link.pathName.endsWith("/spritesheet.webp")
+  ));
+
+  if (!config || !spritesheet || config.url === spritesheet.url) return null;
+  return {
+    petConfigUrl: config.url,
+    spritesheetUrl: spritesheet.url,
+  };
+}
+
 function cleanSingleLine(value, maxLength) {
   const cleaned = value.replace(/\s+/g, " ").trim();
   if (!cleaned || cleaned === "_No response_") return null;
   return cleaned.slice(0, maxLength);
 }
 
+export function extractPetName(title = "") {
+  const withoutPrefix = title.startsWith(PET_TITLE_PREFIX)
+    ? title.slice(PET_TITLE_PREFIX.length)
+    : title;
+  return cleanSingleLine(withoutPrefix, 80);
+}
+
 export function parseSubmission(issue) {
   if (!issue || issue.pull_request || issue.state !== "open" || !issue.user?.login) return null;
 
   const fields = extractFields(issue.body ?? "");
-  const petName = cleanSingleLine(fields[FIELD_LABELS.petName] ?? "", 80);
+  const petName = extractPetName(issue.title ?? "");
   const nickname = cleanSingleLine(fields[FIELD_LABELS.nickname] ?? "", 50);
-  const previewUrl = extractAllowedUrl(fields[FIELD_LABELS.preview]);
-  const packageUrl = extractAllowedUrl(fields[FIELD_LABELS.package]);
+  const description = cleanSingleLine(fields[FIELD_LABELS.description] ?? "", 160);
+  const attachments = extractPetAttachments(fields[FIELD_LABELS.files]);
   const hasConsent = /-\s*\[x\]/i.test(fields[FIELD_LABELS.consent] ?? "");
 
-  if (!petName || !nickname || !previewUrl || !packageUrl || !hasConsent) return null;
+  if (!petName || !nickname || !description || !attachments || !hasConsent) return null;
 
   return {
     issueNumber: issue.number,
     petName,
     nickname,
+    description,
     githubLogin: issue.user.login,
     githubUrl: `https://github.com/${encodeURIComponent(issue.user.login)}`,
-    previewUrl,
-    packageUrl,
+    ...attachments,
     issueUrl: issue.html_url,
     updatedAt: issue.updated_at,
   };
+}
+
+function sanitizeSpriteGrid(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const states = Array.isArray(value.states)
+    ? value.states.slice(0, 11).map((state) => ({
+        id: cleanSingleLine(String(state?.id ?? ""), 40),
+        label: cleanSingleLine(String(state?.label ?? ""), 30),
+        row: Number(state?.row),
+        frames: Number(state?.frames),
+        frameDuration: Number(state?.frameDuration),
+        description: cleanSingleLine(String(state?.description ?? ""), 100),
+      })).filter((state) => state.id && state.label)
+    : undefined;
+
+  return {
+    formatVersion: value.formatVersion === "v2" || Number(value.rows) === 11 ? "v2" : "v1",
+    columns: Number(value.columns) || 8,
+    rows: Number(value.rows) || (value.formatVersion === "v2" ? 11 : 9),
+    defaultState: cleanSingleLine(String(value.defaultState ?? "idle"), 40),
+    ...(states ? { states } : {}),
+  };
+}
+
+export async function hydrateSubmission(submission, { fetchImpl = fetch } = {}) {
+  try {
+    const response = await fetchImpl(submission.petConfigUrl, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return null;
+
+    const declaredSize = Number(response.headers?.get?.("content-length") ?? 0);
+    if (declaredSize > MAX_CONFIG_BYTES) return null;
+    const source = await response.text();
+    if (Buffer.byteLength(source, "utf8") > MAX_CONFIG_BYTES) return null;
+    const config = JSON.parse(source);
+    if (!config || typeof config !== "object" || Array.isArray(config)) return null;
+    if (!cleanSingleLine(String(config.id ?? ""), 80)) return null;
+    if (config.spritesheetPath !== "spritesheet.webp") return null;
+
+    const spriteGrid = normalizeSpriteGrid(sanitizeSpriteGrid(config.spriteGrid) ?? {});
+    if (!validateSpriteGrid(spriteGrid)) return null;
+
+    return {
+      ...submission,
+      petId: cleanSingleLine(String(config.id), 80),
+      spriteGrid,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function selectLatestSubmissions(issues) {
@@ -86,6 +185,22 @@ export function selectLatestSubmissions(issues) {
     const submission = parseSubmission(issue);
     if (!submission || latestByAccount.has(submission.githubLogin)) continue;
     latestByAccount.set(submission.githubLogin, submission);
+  }
+
+  return [...latestByAccount.values()];
+}
+
+export async function selectLatestValidSubmissions(issues, { fetchImpl = fetch } = {}) {
+  const latestByAccount = new Map();
+  const sorted = [...issues].sort(
+    (left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at),
+  );
+
+  for (const issue of sorted) {
+    const candidate = parseSubmission(issue);
+    if (!candidate || latestByAccount.has(candidate.githubLogin)) continue;
+    const submission = await hydrateSubmission(candidate, { fetchImpl });
+    if (submission) latestByAccount.set(submission.githubLogin, submission);
   }
 
   return [...latestByAccount.values()];
@@ -145,7 +260,7 @@ export async function buildGalleryData({
   });
   const data = {
     generatedAt: new Date().toISOString(),
-    pets: selectLatestSubmissions(issues),
+    pets: await selectLatestValidSubmissions(issues, { fetchImpl }),
   };
   const siteDir = path.join(rootDir, "site");
 

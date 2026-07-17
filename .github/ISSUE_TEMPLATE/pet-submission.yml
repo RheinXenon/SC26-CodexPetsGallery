@@ -7,15 +7,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        请上传一张展示图和一个 ZIP 宠物包。提交后约 1–3 分钟会出现在画廊中。
-
-  - type: input
-    id: pet-name
-    attributes:
-      label: 宠物名
-      placeholder: 例如：香蕉猫
-    validations:
-      required: true
+        请在页面最上方的标题栏中，将宠物名填写在 `[宠物投稿]` 后面。
+        投稿只需要原始 `pet.json` 和 `spritesheet.webp`，不需要另外制作展示图或 ZIP。
 
   - type: input
     id: nickname
@@ -27,20 +20,20 @@ body:
       required: true
 
   - type: textarea
-    id: preview
+    id: description
     attributes:
-      label: 展示图
-      description: 将 PNG、GIF 或 WebP 图片拖到这里，等待上传完成后再提交。
-      placeholder: 把展示图拖到这里
+      label: 一句话介绍
+      description: 用一句简短的话介绍你的宠物。画廊中会公开显示。
+      placeholder: 例如：一只会陪我写代码的香蕉猫。
     validations:
       required: true
 
   - type: textarea
-    id: package
+    id: pet-files
     attributes:
-      label: 宠物 ZIP 包
-      description: 将 ZIP 文件拖到这里。画廊只提供下载，不会解析或运行其中内容。
-      placeholder: 把 ZIP 文件拖到这里
+      label: 宠物文件
+      description: 将 `pet.json` 和 `spritesheet.webp` 一起拖到这里，等待两个文件都上传完成后再提交。请保留这两个文件名。
+      placeholder: 把 pet.json 和 spritesheet.webp 拖到这里
     validations:
       required: true
 
@@ -49,5 +42,5 @@ body:
     attributes:
       label: 公开展示确认
       options:
-        - label: 我确认该作品可以在公开画廊中展示，并同意公开以上信息和文件。
+        - label: 我确认该宠物可以在公开画廊中展示，并同意公开以上信息和两个宠物文件。
           required: true

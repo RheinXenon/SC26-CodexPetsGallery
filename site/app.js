@@ -28,7 +28,6 @@ const elements = {
   dialog: document.querySelector("#detail-dialog"),
   dialogClose: document.querySelector("#dialog-close"),
   detailPreview: document.querySelector("#detail-preview"),
-  submissionPreview: document.querySelector("#submission-preview"),
   stateViewer: document.querySelector("#state-viewer"),
   stateList: document.querySelector("#state-list"),
   activeStateName: document.querySelector("#active-state-name"),
@@ -199,13 +198,20 @@ async function loadSubmissions() {
 
   return {
     generatedAt: data.generatedAt,
-    pets: data.pets.map((pet, index) => ({
-      ...pet,
-      kind: "submission",
-      id: `issue-${pet.issueNumber}`,
-      description: `${pet.nickname} 提交的宠物作品。`,
-      accent: ACCENTS[(index + 3) % ACCENTS.length],
-    })),
+    pets: data.pets.map((pet, index) => {
+      const spriteGrid = normalizeSpriteGrid(pet.spriteGrid);
+      if (!validateSpriteGrid(spriteGrid) || !pet.spritesheetUrl) {
+        throw new Error(`投稿 #${pet.issueNumber} 的宠物数据无效`);
+      }
+      return {
+        ...pet,
+        kind: "submission",
+        id: `issue-${pet.issueNumber}`,
+        spriteUrl: pet.spritesheetUrl,
+        spriteGrid,
+        accent: ACCENTS[(index + 3) % ACCENTS.length],
+      };
+    }),
   };
 }
 
@@ -215,26 +221,6 @@ function markBroken(target) {
   const message = document.createElement("span");
   message.textContent = "图片暂时无法显示";
   target.append(message);
-}
-
-function renderSubmissionPreview(pet, target) {
-  target.replaceChildren();
-  target.classList.remove("broken-image");
-  target.style.setProperty("--preview-accent", pet.accent);
-  const imageUrl = safeExternalUrl(pet.previewUrl);
-  if (!imageUrl) {
-    markBroken(target);
-    return null;
-  }
-
-  const image = new Image();
-  image.alt = `${pet.petName} 的展示图`;
-  image.loading = "lazy";
-  image.decoding = "async";
-  image.addEventListener("error", () => markBroken(target), { once: true });
-  image.src = imageUrl;
-  target.append(image);
-  return null;
 }
 
 function getDefaultState(pet) {
@@ -274,9 +260,7 @@ function renderSpritePreview(pet, target, state = getDefaultState(pet)) {
 }
 
 function renderPreview(pet, target) {
-  return pet.kind === "submission"
-    ? renderSubmissionPreview(pet, target)
-    : renderSpritePreview(pet, target);
+  return renderSpritePreview(pet, target);
 }
 
 function renderCard(pet) {
@@ -389,20 +373,17 @@ function openDetail(pet) {
     : `${pet.nickname} · @${pet.githubLogin}`;
   elements.detailDescription.textContent = pet.description;
   elements.detailLinks.replaceChildren();
+  elements.stateViewer.hidden = false;
+  renderStateViewer(pet);
 
   if (pet.kind === "example") {
-    elements.stateViewer.hidden = false;
-    elements.submissionPreview.hidden = true;
-    renderStateViewer(pet);
     appendDetailLink("查看宠物配置", pet.configUrl);
     appendDetailLink("打开完整精灵图", pet.spriteUrl);
   } else {
-    elements.stateViewer.hidden = true;
-    elements.submissionPreview.hidden = false;
-    renderSubmissionPreview(pet, elements.submissionPreview);
     appendDetailLink("作者的 GitHub 主页", pet.githubUrl);
     appendDetailLink("查看原投稿 Issue", pet.issueUrl);
-    appendDetailLink("下载宠物 ZIP 包", pet.packageUrl, { download: true });
+    appendDetailLink("打开 pet.json", pet.petConfigUrl);
+    appendDetailLink("打开 spritesheet.webp", pet.spritesheetUrl);
   }
 
   elements.dialog.showModal();

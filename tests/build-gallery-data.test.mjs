@@ -5,26 +5,28 @@ import { readFile } from "node:fs/promises";
 import {
   extractAllowedUrl,
   extractFields,
+  extractPetAttachments,
+  extractPetName,
+  hydrateSubmission,
   isAllowedGithubAttachment,
   parseSubmission,
   selectLatestSubmissions,
+  selectLatestValidSubmissions,
 } from "../scripts/build-gallery-data.mjs";
 import {
   normalizeSpriteGrid,
   resolveSpriteLayout,
 } from "../site/sprite-format.js";
 
-const validBody = ({ name = "小火苗", nickname = "阿澈", suffix = "one" } = {}) => `### 宠物名
-${name}
-
-### 学员昵称
+const validBody = ({ nickname = "阿澈", suffix = "one" } = {}) => `### 学员昵称
 ${nickname}
 
-### 展示图
-![preview](https://github.com/user-attachments/assets/${suffix})
+### 一句话介绍
+一只会帮我检查代码的小伙伴。
 
-### 宠物 ZIP 包
-[pet.zip](https://github.com/user-attachments/files/${suffix})
+### 宠物文件
+[pet.json](https://github.com/user-attachments/files/${suffix}/pet.json)
+![spritesheet](https://github.com/user-attachments/assets/${suffix})
 
 ### 公开展示确认
 - [x] 我确认该作品可以公开展示
@@ -33,6 +35,7 @@ ${nickname}
 function issue(overrides = {}) {
   return {
     number: 7,
+    title: "[宠物投稿] 小火苗",
     state: "open",
     body: validBody(),
     user: { login: "student" },
@@ -44,7 +47,8 @@ function issue(overrides = {}) {
 
 test("extractFields 读取 Issue Form 生成的标题字段", () => {
   const fields = extractFields(validBody());
-  assert.equal(fields["宠物名"], "小火苗");
+  assert.equal(fields["学员昵称"], "阿澈");
+  assert.equal(extractPetName("[宠物投稿] 小火苗"), "小火苗");
   assert.match(fields["公开展示确认"], /\[x\]/);
 });
 
@@ -55,15 +59,27 @@ test("只接受 GitHub 托管的附件地址", () => {
   assert.equal(extractAllowedUrl("![x](https://example.com/x.png)"), null);
 });
 
+test("宠物文件必须同时包含具名的 pet.json 和 spritesheet.webp", () => {
+  assert.deepEqual(extractPetAttachments(`
+[pet.json](https://github.com/user-attachments/files/one/pet.json)
+![spritesheet](https://github.com/user-attachments/assets/one)
+`), {
+    petConfigUrl: "https://github.com/user-attachments/files/one/pet.json",
+    spritesheetUrl: "https://github.com/user-attachments/assets/one",
+  });
+  assert.equal(extractPetAttachments("![other](https://github.com/user-attachments/assets/one)"), null);
+});
+
 test("有效投稿会转成公开画廊数据", () => {
   assert.deepEqual(parseSubmission(issue()), {
     issueNumber: 7,
     petName: "小火苗",
     nickname: "阿澈",
+    description: "一只会帮我检查代码的小伙伴。",
     githubLogin: "student",
     githubUrl: "https://github.com/student",
-    previewUrl: "https://github.com/user-attachments/assets/one",
-    packageUrl: "https://github.com/user-attachments/files/one",
+    petConfigUrl: "https://github.com/user-attachments/files/one/pet.json",
+    spritesheetUrl: "https://github.com/user-attachments/assets/one",
     issueUrl: "https://github.com/owner/repo/issues/7",
     updatedAt: "2026-07-17T08:00:00Z",
   });
@@ -78,8 +94,9 @@ test("同一账号只保留最近更新的有效投稿", () => {
   const older = issue({ number: 1, updated_at: "2026-07-16T08:00:00Z" });
   const newer = issue({
     number: 2,
+    title: "[宠物投稿] 新宠物",
     updated_at: "2026-07-17T09:00:00Z",
-    body: validBody({ name: "新宠物", suffix: "two" }),
+    body: validBody({ suffix: "two" }),
   });
   const other = issue({
     number: 3,
@@ -90,6 +107,46 @@ test("同一账号只保留最近更新的有效投稿", () => {
   const selected = selectLatestSubmissions([older, newer, other]);
   assert.equal(selected.length, 2);
   assert.equal(selected.find((pet) => pet.githubLogin === "student").petName, "新宠物");
+});
+
+test("pet.json 通过校验后会补齐精灵图配置", async () => {
+  const submission = parseSubmission(issue());
+  const hydrated = await hydrateSubmission(submission, {
+    fetchImpl: async () => ({
+      ok: true,
+      headers: { get: () => "120" },
+      text: async () => JSON.stringify({
+        id: "spark",
+        spritesheetPath: "spritesheet.webp",
+      }),
+    }),
+  });
+
+  assert.equal(hydrated.petId, "spark");
+  assert.equal(hydrated.spriteGrid.columns, 8);
+  assert.equal(hydrated.spriteGrid.states.length, 9);
+});
+
+test("同一账号的最新附件无效时会回退到较早的有效投稿", async () => {
+  const older = issue({ number: 1, updated_at: "2026-07-16T08:00:00Z" });
+  const newer = issue({
+    number: 2,
+    title: "[宠物投稿] 无效新投稿",
+    updated_at: "2026-07-17T09:00:00Z",
+    body: validBody({ suffix: "invalid" }),
+  });
+  const selected = await selectLatestValidSubmissions([older, newer], {
+    fetchImpl: async (url) => ({
+      ok: true,
+      headers: { get: () => "120" },
+      text: async () => url.includes("invalid")
+        ? "not json"
+        : JSON.stringify({ id: "spark", spritesheetPath: "spritesheet.webp" }),
+    }),
+  });
+
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].issueNumber, 1);
 });
 
 test("三个示例宠物都使用完整且不越界的精灵图状态配置", async () => {
