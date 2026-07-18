@@ -93,6 +93,12 @@ type AnimatorOptions = {
   onReady?: () => void;
   onError?: (error: unknown) => void;
   imageLoader?: (url: string) => Promise<HTMLImageElement>;
+  /** Start on this frame (wrapped by state.frames). */
+  startFrame?: number;
+  /** Playback speed multiplier. 1 = normal, 1.2 = faster. */
+  speed?: number;
+  /** Shift the first tick backward so pets desync without waiting. */
+  phaseOffsetMs?: number;
 };
 
 export class SpriteAnimator {
@@ -108,8 +114,22 @@ export class SpriteAnimator {
   animationFrame: number | null = null;
   destroyed = false;
   image: HTMLImageElement | null = null;
+  speed = 1;
+  phaseOffsetMs = 0;
+  ready = false;
 
-  constructor({ canvas, url, grid, state, onReady, onError, imageLoader = loadSpriteImage }: AnimatorOptions) {
+  constructor({
+    canvas,
+    url,
+    grid,
+    state,
+    onReady,
+    onError,
+    imageLoader = loadSpriteImage,
+    startFrame = 0,
+    speed = 1,
+    phaseOffsetMs = 0,
+  }: AnimatorOptions) {
     this.canvas = canvas;
     this.url = url;
     this.grid = grid;
@@ -117,6 +137,10 @@ export class SpriteAnimator {
     this.onReady = onReady;
     this.onError = onError;
     this.imageLoader = imageLoader;
+    this.speed = Math.max(0.25, speed || 1);
+    this.phaseOffsetMs = Math.max(0, phaseOffsetMs || 0);
+    const frames = Math.max(1, state.frames || 1);
+    this.frameIndex = ((Math.floor(startFrame) % frames) + frames) % frames;
     this.tick = this.tick.bind(this);
     void this.load();
   }
@@ -130,6 +154,7 @@ export class SpriteAnimator {
       if (frame.width < 1 || frame.height < 1) throw new Error("精灵图尺寸无效");
       this.canvas.width = frame.width;
       this.canvas.height = frame.height;
+      this.ready = true;
       this.draw();
       this.onReady?.();
       if (!reduceMotion) this.animationFrame = requestAnimationFrame(this.tick);
@@ -140,12 +165,15 @@ export class SpriteAnimator {
 
   tick(timestamp: number) {
     if (this.destroyed) return;
-    if (!this.lastFrameAt) this.lastFrameAt = timestamp;
+    if (!this.lastFrameAt) {
+      // Apply phase offset once so each actor starts mid-cycle.
+      this.lastFrameAt = timestamp - this.phaseOffsetMs;
+    }
 
-    const duration = Number(this.state.frameDuration);
+    const duration = Math.max(16, Number(this.state.frameDuration) / this.speed);
     if (timestamp - this.lastFrameAt >= duration) {
       const elapsedFrames = Math.floor((timestamp - this.lastFrameAt) / duration);
-      this.frameIndex = (this.frameIndex + elapsedFrames) % this.state.frames;
+      this.frameIndex = (this.frameIndex + elapsedFrames) % Math.max(1, this.state.frames);
       this.lastFrameAt += elapsedFrames * duration;
       this.draw();
     }
@@ -159,6 +187,10 @@ export class SpriteAnimator {
     drawSpriteFrame(context, this.image, this.grid, this.state, this.frameIndex);
   }
 
+  getFrameIndex() {
+    return this.frameIndex;
+  }
+
   setState(state: SpriteState) {
     this.state = state;
     this.frameIndex = 0;
@@ -169,6 +201,7 @@ export class SpriteAnimator {
 
   destroy() {
     this.destroyed = true;
+    this.ready = false;
     if (this.animationFrame !== null) cancelAnimationFrame(this.animationFrame);
     this.image = null;
   }

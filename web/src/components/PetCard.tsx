@@ -34,8 +34,8 @@ export function PetCard({
     <button
       type="button"
       data-pet-id={pet.id}
-      className={`group fade-up flex h-full w-full flex-col overflow-hidden rounded-[1.5rem] border bg-white text-left shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_40px_rgba(59,130,246,0.12),0_6px_16px_rgba(15,23,42,0.06)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-        selected ? "border-brand ring-2 ring-brand/20" : "border-slate-200/90"
+      className={`group fade-up flex h-full w-full flex-col overflow-hidden rounded-[1.5rem] border bg-white text-left shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_rgba(15,23,42,0.05)] transition duration-300 will-change-transform hover:-translate-y-1.5 hover:shadow-[0_18px_40px_rgba(59,130,246,0.14),0_6px_16px_rgba(15,23,42,0.06)] active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+        selected ? "border-brand ring-2 ring-brand/20 shadow-[0_12px_28px_rgba(59,130,246,0.16)]" : "border-slate-200/90"
       }`}
       style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
       aria-label={selectMode ? `${selected ? "取消选择" : "选择"} ${pet.petName}` : `查看 ${pet.petName} 的详情`}

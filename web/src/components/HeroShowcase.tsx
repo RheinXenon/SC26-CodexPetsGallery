@@ -54,6 +54,13 @@ export function HeroShowcase({ pets, eventName, submissionCount }: Props) {
           `,
         }}
       />
+      {!reduceMotion ? (
+        <>
+          <div className="hero-float-orb hero-float-orb-a" aria-hidden="true" />
+          <div className="hero-float-orb hero-float-orb-b" aria-hidden="true" />
+          <div className="hero-float-orb hero-float-orb-c" aria-hidden="true" />
+        </>
+      ) : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-[var(--color-canvas)]" />
 
       <div className="shell relative py-10 sm:py-14">
@@ -61,17 +68,17 @@ export function HeroShowcase({ pets, eventName, submissionCount }: Props) {
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-brand">
             {eventName} · Pet Index
           </p>
-          <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">
+          <h1 className="mt-4 text-balance text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">
             大家的宠物
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-slate-500 sm:text-base">
+          <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-7 text-slate-500 sm:text-base">
             SummerCamp 学员创作的 Codex 精灵图鉴。浏览九态动画，分享喜欢的宠物，也可以挑选几只来张合影。
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <div className="rounded-full border border-white/80 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur">
+            <div className="rounded-full border border-white/80 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
               <span className="tabular-nums text-brand">{submissionCount}</span> 份学员作品
             </div>
-            <div className="rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur">
+            <div className="rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
               九态动画 · 合影 · 深链分享
             </div>
           </div>
@@ -108,7 +115,7 @@ export function HeroShowcase({ pets, eventName, submissionCount }: Props) {
                         <img
                           src={pet.posterUrl}
                           alt={pet.petName}
-                          className="pixelated max-h-[85%] max-w-[85%] object-contain drop-shadow-md"
+                          className="pixelated max-h-[85%] max-w-[85%] object-contain drop-shadow-md transition duration-500 group-hover:-translate-y-1 group-hover:scale-105"
                           loading="eager"
                         />
                       ) : (

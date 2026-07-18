@@ -199,19 +199,19 @@ export function App() {
           ) : null}
 
           {selectMode ? (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand/15 bg-brand-soft/90 px-4 py-3 text-sm text-brand-dark shadow-sm">
-              <span>合影选宠模式：点击卡片勾选，最多 {PHOTO_MAX} 只。已选 {selectedIds.length} 只。</span>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand/15 bg-gradient-to-r from-brand-soft via-white to-brand-soft/80 px-4 py-3 text-sm text-brand-dark shadow-[0_10px_28px_rgba(59,130,246,0.08)]">
+              <span className="font-medium">合影选宠中：点击卡片勾选，最多 {PHOTO_MAX} 只。已选 <strong className="tabular-nums">{selectedIds.length}</strong> 只。</span>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="rounded-full bg-brand px-3.5 py-1.5 font-semibold text-white shadow-[0_8px_16px_rgba(59,130,246,0.25)]"
+                  className="rounded-full bg-brand px-3.5 py-1.5 font-semibold text-white shadow-[0_8px_16px_rgba(59,130,246,0.25)] transition hover:bg-brand-dark active:scale-[0.98]"
                   onClick={() => setPhotoOpen(true)}
                 >
-                  去合影
+                  进入合影棚
                 </button>
                 <button
                   type="button"
-                  className="rounded-full border border-brand/20 bg-white px-3.5 py-1.5 font-semibold"
+                  className="rounded-full border border-brand/20 bg-white px-3.5 py-1.5 font-semibold transition hover:border-brand/40 active:scale-[0.98]"
                   onClick={() => setSelectMode(false)}
                 >
                   退出选宠

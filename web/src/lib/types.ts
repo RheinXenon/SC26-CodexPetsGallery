@@ -57,6 +57,51 @@ export type UrlState = {
   page: number;
 };
 
+/** Built-in photo-booth atmosphere effects. */
+export type PhotoSceneFx =
+  | "sunny"
+  | "snow"
+  | "mint"
+  | "dusk"
+  | "neon-rain"
+  | "starry"
+  | "sakura";
+
 export type PhotoBackground =
-  | { id: string; label: string; type: "gradient"; from: string; to: string }
+  | {
+      id: string;
+      label: string;
+      type: "gradient";
+      from: string;
+      to: string;
+      /** Optional mid-stop for richer sky gradients. */
+      mid?: string;
+      accent?: string;
+      /** Force dark UI chrome (nameplates / slogan). */
+      dark?: boolean;
+      /** Live stage + export atmosphere. */
+      fx?: PhotoSceneFx;
+    }
   | { id: string; label: string; type: "image"; src: string };
+
+export type SloganStyle = "plain" | "badge" | "outline" | "glow";
+export type SloganPosition =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "center"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
+
+export type PhotoSlogan = {
+  text: string;
+  size: number;
+  style: SloganStyle;
+  position: SloganPosition;
+  color: string;
+};
+
+/** What each actor nameplate shows under the pet. */
+export type PhotoNameMode = "hidden" | "pet" | "github" | "nickname";
+

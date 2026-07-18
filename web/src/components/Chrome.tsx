@@ -24,7 +24,7 @@ export function SiteHeader({
     <header className="sticky top-0 z-40 border-b border-line/80 bg-white/75 backdrop-blur-xl">
       <div className="shell flex min-h-[4.25rem] flex-wrap items-center justify-between gap-3 py-3">
         <a href="./" className="group flex items-center gap-3 no-underline">
-          <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(59,130,246,0.28)]">
+          <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(59,130,246,0.28)] transition duration-300 group-hover:scale-105 group-hover:shadow-[0_12px_28px_rgba(59,130,246,0.36)]">
             <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.35),transparent_45%)]" />
             <span className="relative">SC</span>
           </span>
@@ -37,7 +37,7 @@ export function SiteHeader({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+            className={`rounded-full px-3.5 py-2 text-sm font-semibold transition active:scale-[0.98] ${
               selectMode
                 ? "bg-brand text-white shadow-[0_8px_18px_rgba(59,130,246,0.28)]"
                 : "border border-line bg-white text-ink-soft hover:border-brand/30 hover:text-brand"
@@ -48,13 +48,13 @@ export function SiteHeader({
           </button>
           <button
             type="button"
-            className="rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink-soft transition hover:border-brand/30 hover:text-brand"
+            className="rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink-soft transition hover:border-brand/30 hover:text-brand active:scale-[0.98]"
             onClick={onOpenPhotoBooth}
           >
             打开合影
           </button>
           <a
-            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_10px_22px_rgba(59,130,246,0.28)] transition hover:bg-brand-dark"
+            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_10px_22px_rgba(59,130,246,0.28)] transition hover:bg-brand-dark hover:shadow-[0_14px_28px_rgba(59,130,246,0.34)] active:scale-[0.98]"
             href={submitHref}
             target="_blank"
             rel="noreferrer"
