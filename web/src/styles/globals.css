@@ -337,6 +337,12 @@
     transform: scale(1.02);
   }
 
+  .photo-stage-canvas {
+    z-index: 1;
+    pointer-events: none;
+    image-rendering: auto;
+  }
+
   .photo-stage-sheen {
     position: absolute;
     inset: -20% -30%;

@@ -870,6 +870,17 @@ function paintSakuraScene(
   paintGround(ctx, width, height, false, "rgba(190, 24, 93, 0.1)");
 }
 
+/** Paint a full scene (or custom image) onto a canvas — shared by export + live stage. */
+export function paintSceneBackground(
+  ctx: CanvasRenderingContext2D,
+  background: PhotoBackground,
+  width: number,
+  height: number,
+  image?: HTMLImageElement | null,
+) {
+  fillBackground(ctx, background, width, height, image);
+}
+
 function fillBackground(
   ctx: CanvasRenderingContext2D,
   background: PhotoBackground,

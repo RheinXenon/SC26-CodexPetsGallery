@@ -15,6 +15,7 @@ import {
   getPreviewPlayback,
   isDarkBackground,
   layoutSlots,
+  paintSceneBackground,
   resolvePhotoNameLabel,
   resolveSceneFx,
   sloganPositionClass,
@@ -741,21 +742,9 @@ export function PhotoBooth({
 
           <section className="flex min-h-0 flex-col gap-3 overflow-auto p-4 sm:p-5">
             <div className="photo-stage relative aspect-[16/9] w-full overflow-hidden rounded-[1.5rem] border border-line/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_18px_40px_rgba(15,23,42,0.08)]">
-              <div
-                className="photo-stage-bg absolute inset-0 transition-[background] duration-700"
-                style={backgroundStyle(background)}
-              />
+              <StageBackdrop background={background} />
 
               <StageAtmosphere fx={sceneFx} dark={dark} />
-
-              <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-[4] h-[38%]"
-                style={{
-                  background: dark
-                    ? "linear-gradient(180deg, transparent, rgba(0,0,0,0.35))"
-                    : "linear-gradient(180deg, transparent, rgba(15,23,42,0.10))",
-                }}
-              />
 
               {slogan.text.trim() ? (
                 <div className={`pointer-events-none absolute inset-0 z-20 flex p-4 sm:p-6 ${sloganPositionClass(slogan.position)}`}>
@@ -853,17 +842,87 @@ function getDefaultFrameCount(pet: Pet) {
   return Math.max(1, state?.frames || 1);
 }
 
-/** Live stage weather / décor layer — pure CSS particles, distinct per scene. */
-function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean }) {
+/**
+ * Live-stage backdrop that reuses the same canvas scene painter as PNG export.
+ * This keeps skyline / swirls / décor identical between preview and download.
+ */
+function StageBackdrop({ background }: { background: PhotoBackground }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+  // CSS fallback while canvas paints / for reduced-fidelity quick flash
+  const fallbackStyle = useMemo(() => backgroundStyle(background), [background]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let cancelled = false;
+    setReady(false);
+
+    const paint = async () => {
+      // Render at stage design resolution; CSS scales it to the live box.
+      const width = STAGE_W;
+      const height = STAGE_H;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      try {
+        let image: HTMLImageElement | null = null;
+        if (background.type === "image") {
+          image = await requestImage(background.src, {
+            anonymous: background.src.startsWith("http"),
+          });
+        }
+        if (cancelled) return;
+        paintSceneBackground(ctx, background, width, height, image);
+        if (!cancelled) setReady(true);
+      } catch {
+        // Keep CSS fallback visible if image load fails.
+        if (!cancelled) setReady(false);
+      }
+    };
+
+    void paint();
+    return () => {
+      cancelled = true;
+    };
+  }, [background]);
+
+  return (
+    <>
+      <div
+        className={`photo-stage-bg absolute inset-0 transition-opacity duration-500 ${
+          ready ? "opacity-0" : "opacity-100"
+        }`}
+        style={fallbackStyle}
+        aria-hidden="true"
+      />
+      <canvas
+        ref={canvasRef}
+        className={`photo-stage-canvas absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+          ready ? "opacity-100" : "opacity-0"
+        }`}
+        width={STAGE_W}
+        height={STAGE_H}
+        aria-hidden="true"
+      />
+    </>
+  );
+}
+
+/**
+ * Live weather particles only.
+ * Static décor (skyline, hills, moon, pines…) already lives in the canvas backdrop
+ * so we deliberately avoid duplicating it here — keeps preview == export.
+ */
+function StageAtmosphere({ fx }: { fx: PhotoSceneFx | null; dark: boolean }) {
   if (!fx || reduceMotion) return null;
 
   if (fx === "sunny") {
     return (
       <div className="photo-fx photo-fx-sunny" aria-hidden="true">
-        <div className="photo-fx-sun" />
-        <div className="photo-fx-cloud photo-fx-cloud-a" />
-        <div className="photo-fx-cloud photo-fx-cloud-b" />
-        <div className="photo-fx-cloud photo-fx-cloud-c" />
         {Array.from({ length: 10 }, (_, i) => (
           <span key={i} className={`photo-fx-spark photo-fx-spark-${i}`} />
         ))}
@@ -876,11 +935,6 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
   if (fx === "snow") {
     return (
       <div className="photo-fx photo-fx-snow" aria-hidden="true">
-        <div className="photo-fx-winter-sun" />
-        <div className="photo-fx-pine photo-fx-pine-a" />
-        <div className="photo-fx-pine photo-fx-pine-b" />
-        <div className="photo-fx-pine photo-fx-pine-c" />
-        <div className="photo-fx-snowbank" />
         {Array.from({ length: 28 }, (_, i) => (
           <span key={i} className={`photo-fx-flake photo-fx-flake-${i}`} />
         ))}
@@ -894,9 +948,6 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
         {Array.from({ length: 12 }, (_, i) => (
           <span key={`leaf-${i}`} className={`photo-fx-leaf photo-fx-leaf-${i}`} />
         ))}
-        {Array.from({ length: 10 }, (_, i) => (
-          <span key={`dew-${i}`} className={`photo-fx-dew photo-fx-dew-${i}`} />
-        ))}
         {Array.from({ length: 8 }, (_, i) => (
           <span key={`fly-${i}`} className={`photo-fx-firefly photo-fx-firefly-${i}`} />
         ))}
@@ -907,11 +958,6 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
   if (fx === "dusk") {
     return (
       <div className="photo-fx photo-fx-dusk" aria-hidden="true">
-        <div className="photo-fx-sunset-orb" />
-        <div className="photo-fx-haze photo-fx-haze-a" />
-        <div className="photo-fx-haze photo-fx-haze-b" />
-        <div className="photo-fx-hill photo-fx-hill-a" />
-        <div className="photo-fx-hill photo-fx-hill-b" />
         {Array.from({ length: 12 }, (_, i) => (
           <span key={i} className={`photo-fx-dusk-star photo-fx-dusk-star-${i}`} />
         ))}
@@ -922,12 +968,11 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
   if (fx === "neon-rain") {
     return (
       <>
+        {/* Soft living bokeh over the canvas skyline */}
         <div className="photo-fx photo-fx-neon" aria-hidden="true">
-          {Array.from({ length: 14 }, (_, i) => (
+          {Array.from({ length: 10 }, (_, i) => (
             <span key={`bokeh-${i}`} className={`photo-fx-bokeh photo-fx-bokeh-${i}`} />
           ))}
-          <div className="photo-fx-skyline" />
-          <div className="photo-fx-glass-mist" />
         </div>
         {/* Glass rain sits in front of pets to sell the window plane. */}
         <div className="photo-fx photo-fx-neon-glass" aria-hidden="true">
@@ -945,11 +990,6 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
   if (fx === "starry") {
     return (
       <div className="photo-fx photo-fx-starry" aria-hidden="true">
-        <div className="photo-fx-swirl photo-fx-swirl-a" />
-        <div className="photo-fx-swirl photo-fx-swirl-b" />
-        <div className="photo-fx-swirl photo-fx-swirl-c" />
-        <div className="photo-fx-moon" />
-        <div className="photo-fx-cypress" />
         {Array.from({ length: 18 }, (_, i) => (
           <span key={i} className={`photo-fx-star photo-fx-star-${i}`} />
         ))}
@@ -960,8 +1000,6 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
   if (fx === "sakura") {
     return (
       <div className="photo-fx photo-fx-sakura" aria-hidden="true">
-        <div className="photo-fx-branch photo-fx-branch-l" />
-        <div className="photo-fx-branch photo-fx-branch-r" />
         {Array.from({ length: 22 }, (_, i) => (
           <span key={i} className={`photo-fx-petal photo-fx-petal-${i}`} />
         ))}
@@ -969,10 +1007,5 @@ function StageAtmosphere({ fx, dark }: { fx: PhotoSceneFx | null; dark: boolean 
     );
   }
 
-  // Generic soft sheen for unknown / image scenes
-  return dark ? null : (
-    <div className="photo-fx" aria-hidden="true">
-      <div className="photo-stage-sheen" />
-    </div>
-  );
+  return null;
 }
