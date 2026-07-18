@@ -222,7 +222,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
   const [nameMode, setNameMode] = useState<PhotoNameMode>("hidden");
   const [showCarpets, setShowCarpets] = useState(false);
   const [slogan, setSlogan] = useState<PhotoSlogan>(() => buildDefaultCampSlogan(0));
-  const [panel, setPanel] = useState<"scene" | "slogan" | "name" | "carpet">("scene");
+  const [panel, setPanel] = useState<"scene" | "slogan" | "name">("scene");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
@@ -232,6 +232,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
 
   const stageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const actorHandles = useRef(new Map<string, ActorHandle>());
   const dragRef = useRef<{
     pointerId: number;
@@ -241,6 +242,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
     originY: number;
     moved: boolean;
   } | null>(null);
+  const [stageFit, setStageFit] = useState({ width: 0, height: 0 });
 
   const stage = CAMP_STAGE[aspect];
   const background: PhotoBackground =
@@ -250,6 +252,38 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
     () => layoutCampSlots(campPets, stage.width, stage.height, aspect),
     [campPets, stage.width, stage.height, aspect],
   );
+
+  // Keep the full poster visible (letterbox/pillarbox) instead of clipping tall 2:3 art.
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!open || !frame) return;
+
+    const measure = () => {
+      const styles = getComputedStyle(frame);
+      const padX = (Number.parseFloat(styles.paddingLeft) || 0) + (Number.parseFloat(styles.paddingRight) || 0);
+      const padY = (Number.parseFloat(styles.paddingTop) || 0) + (Number.parseFloat(styles.paddingBottom) || 0);
+      const cw = Math.max(0, frame.clientWidth - padX);
+      const ch = Math.max(0, frame.clientHeight - padY);
+      if (cw < 2 || ch < 2) return;
+      const ar = stage.width / stage.height;
+      let width = cw;
+      let height = width / ar;
+      if (height > ch) {
+        height = ch;
+        width = height * ar;
+      }
+      setStageFit((current) => (
+        Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5
+          ? current
+          : { width, height }
+      ));
+    };
+
+    measure();
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [open, stage.width, stage.height, aspect]);
 
   const slotByPetId = useMemo(() => {
     const map = new Map<string, CampPhotoSlot>();
@@ -393,7 +427,6 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
     ? campPets.find((pet) => pet.id === selectedPetId) ?? null
     : null;
   const canExport = campPets.length > 0 && !busy;
-  const aspectRatio = `${stage.width} / ${stage.height}`;
 
   function updateSlogan<K extends keyof PhotoSlogan>(key: K, value: PhotoSlogan[K]) {
     setSlogan((current) => ({ ...current, [key]: value }));
@@ -419,7 +452,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
     setBusy(true);
     setMessage(null);
     try {
-      if (campPets.length === 0) throw new Error("还没有学员宠物入镜");
+      if (campPets.length === 0) throw new Error("还没有宠物可以合影");
       const poseByPetId = capturePoseByPetId();
       const canvas = await composeCampPhoto({
         pets: campPets,
@@ -431,9 +464,9 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
         poseByPetId,
       });
       await downloadCanvasPng(canvas, "vibecoding-camp-all.png");
-      setMessage("全营纪念照已保存，去发一张结营海报吧。");
+      setMessage("图片已保存，可以去发啦。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "导出失败");
+      setMessage(error instanceof Error ? error.message : "保存失败");
     } finally {
       setBusy(false);
     }
@@ -494,12 +527,11 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
         <header className="relative flex items-center justify-between gap-3 border-b border-line/80 px-4 py-4 sm:px-6">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-600">Camp Memorial</p>
             <h2 className="truncate text-xl font-extrabold tracking-tight text-ink">全营纪念照</h2>
             <p className="mt-0.5 text-xs text-muted">
               {campPets.length > 0
-                ? `学员作品 ${campPets.length} 只 · 按组排好的毕业合影`
-                : "等待第一批学员宠物入镜"}
+                ? `已经有 ${campPets.length} 只宠物入场啦`
+                : "还没有宠物来合影"}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -534,14 +566,13 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.22fr)]">
+        <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(0,0.58fr)_minmax(0,1.52fr)]">
           <section className="flex min-h-0 flex-col border-b border-line/80 lg:border-b-0 lg:border-r">
             <div className="flex gap-1 border-b border-line/70 bg-canvas/50 p-2">
               {([
                 ["scene", "场景"],
                 ["slogan", "标语"],
                 ["name", "名牌"],
-                ["carpet", "地毯"],
               ] as const).map(([id, label]) => (
                 <button
                   key={id}
@@ -558,7 +589,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
               ))}
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-auto p-4 sm:p-5">
+            <div className="min-h-0 flex-1 space-y-4 overflow-auto p-3 sm:p-4">
               <div className="sm:hidden">
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted">画幅</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -586,9 +617,9 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
               {panel === "scene" ? (
                 <>
                   <p className="text-sm leading-6 text-muted">
-                    官方场景一键切换。默认「典礼」是全营专属舞台，导出与预览一致。
+                    换个背景，挑一张你喜欢的。
                   </p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2">
                     {PHOTO_BACKGROUNDS.map((item) => (
                       <button
                         key={item.id}
@@ -608,7 +639,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                           <span className="text-sm font-medium">{item.label}</span>
                           {item.id === CEREMONY_BACKGROUND_ID ? (
                             <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                              默认
+                              推荐
                             </span>
                           ) : null}
                         </span>
@@ -621,10 +652,10 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
               {panel === "slogan" ? (
                 <div className="space-y-4">
                   <p className="text-sm leading-6 text-muted">
-                    默认标题可整句修改。改完右侧立刻更新，导出会带上。
+                    想写点什么就改这里，右边会马上看到效果。
                   </p>
                   <label className="flex flex-col gap-1.5 text-sm">
-                    <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted">标语文案</span>
+                    <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted">标题文字</span>
                     <input
                       className="rounded-2xl border border-line bg-canvas/60 px-3 py-2.5 outline-none transition focus:border-brand/40 focus:bg-white focus:ring-4 focus:ring-brand/10"
                       type="text"
@@ -688,7 +719,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                     </div>
                   </div>
                   <label className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas/50 px-3 py-2.5 text-sm">
-                    <span className="font-medium text-ink-soft">标语颜色</span>
+                    <span className="font-medium text-ink-soft">文字颜色</span>
                     <input
                       type="color"
                       value={slogan.color}
@@ -701,82 +732,82 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                     className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink-soft transition hover:border-brand/30"
                     onClick={() => setSlogan(buildDefaultCampSlogan(campPets.length))}
                   >
-                    恢复默认标语
+                    恢复默认标题
                   </button>
                 </div>
               ) : null}
 
               {panel === "name" ? (
-                <div className="space-y-4">
-                  <p className="text-sm leading-6 text-muted">
-                    默认不显示名牌，画面更像毕业照。需要认人时可打开；过密时小字会自动隐藏。
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {PHOTO_NAME_MODE_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`rounded-2xl border px-3.5 py-3 text-left transition ${
-                          nameMode === option.id
-                            ? "border-brand bg-brand-soft text-brand ring-2 ring-brand/10"
-                            : "border-line bg-white text-ink-soft hover:border-brand/25"
-                        }`}
-                        onClick={() => setNameMode(option.id)}
-                      >
-                        <span className="block text-sm font-semibold">{option.label}</span>
-                        <span className={`mt-1 block text-xs leading-5 ${
-                          nameMode === option.id ? "text-brand/80" : "text-muted"
-                        }`}>
-                          {option.hint}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {panel === "carpet" ? (
-                <div className="space-y-4">
-                  <p className="text-sm leading-6 text-muted">
-                    默认只做同组软聚集、不画分割。打开后按组铺浅色地毯，方便扫视「我们组在哪」。
-                  </p>
-                  <button
-                    type="button"
-                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
-                      showCarpets
-                        ? "border-brand bg-brand-soft text-brand ring-2 ring-brand/10"
-                        : "border-line bg-white text-ink-soft hover:border-brand/25"
-                    }`}
-                    onClick={() => setShowCarpets((value) => !value)}
-                  >
-                    <span>
-                      <span className="block text-sm font-semibold">分组分色地毯</span>
-                      <span className={`mt-1 block text-xs ${showCarpets ? "text-brand/80" : "text-muted"}`}>
-                        {showCarpets ? "已开启" : "已关闭（推荐发海报时关闭）"}
-                      </span>
-                    </span>
-                    <span className={`grid h-7 w-12 place-items-center rounded-full text-[11px] font-bold ${
-                      showCarpets ? "bg-brand text-white" : "bg-canvas text-muted"
-                    }`}>
-                      {showCarpets ? "ON" : "OFF"}
-                    </span>
-                  </button>
-                  {showCarpets ? (
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(new Set(campPets.map((pet) => groupKeyOf(pet)))).slice(0, 12).map((key) => (
-                        <span
-                          key={key}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-soft"
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    <p className="text-sm leading-6 text-muted">
+                      可以给每只宠物脚下加名字，默认先不显示。
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {PHOTO_NAME_MODE_OPTIONS.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`rounded-2xl border px-3.5 py-3 text-left transition ${
+                            nameMode === option.id
+                              ? "border-brand bg-brand-soft text-brand ring-2 ring-brand/10"
+                              : "border-line bg-white text-ink-soft hover:border-brand/25"
+                          }`}
+                          onClick={() => setNameMode(option.id)}
                         >
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ background: groupCarpetColor(key, 0.9) }}
-                          />
-                          {key === "none" ? "未分组" : `第 ${key} 组`}
-                        </span>
+                          <span className="block text-sm font-semibold">{option.label}</span>
+                          <span className={`mt-1 block text-xs leading-5 ${
+                            nameMode === option.id ? "text-brand/80" : "text-muted"
+                          }`}>
+                            {option.hint}
+                          </span>
+                        </button>
                       ))}
                     </div>
-                  ) : null}
+                  </div>
+
+                  <div className="space-y-3 border-t border-line/70 pt-4">
+                    <p className="text-sm leading-6 text-muted">
+                      打开后，同一组会铺上浅色底，更容易找到自己的组。
+                    </p>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                        showCarpets
+                          ? "border-brand bg-brand-soft text-brand ring-2 ring-brand/10"
+                          : "border-line bg-white text-ink-soft hover:border-brand/25"
+                      }`}
+                      onClick={() => setShowCarpets((value) => !value)}
+                    >
+                      <span>
+                        <span className="block text-sm font-semibold">按组显示颜色</span>
+                        <span className={`mt-1 block text-xs ${showCarpets ? "text-brand/80" : "text-muted"}`}>
+                          {showCarpets ? "已打开" : "已关闭"}
+                        </span>
+                      </span>
+                      <span className={`grid h-7 w-12 place-items-center rounded-full text-[11px] font-bold ${
+                        showCarpets ? "bg-brand text-white" : "bg-canvas text-muted"
+                      }`}>
+                        {showCarpets ? "开" : "关"}
+                      </span>
+                    </button>
+                    {showCarpets ? (
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(new Set(campPets.map((pet) => groupKeyOf(pet)))).slice(0, 12).map((key) => (
+                          <span
+                            key={key}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-soft"
+                          >
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ background: groupCarpetColor(key, 0.9) }}
+                            />
+                            {key === "none" ? "未分组" : `第 ${key} 组`}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -793,13 +824,18 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
               onPointerCancel={onPointerUp}
             >
               <div
-                className="flex max-h-[min(62dvh,720px)] min-h-[240px] w-full items-center justify-center overflow-hidden p-2 sm:p-3"
+                ref={frameRef}
+                className="camp-stage-frame flex h-[min(72dvh,860px)] min-h-[320px] w-full items-center justify-center overflow-hidden p-2 sm:p-3"
               >
                 <div
                   ref={stageRef}
-                  className="photo-stage camp-stage relative w-full max-w-full origin-center will-change-transform"
+                  className="photo-stage camp-stage relative origin-center will-change-transform"
                   style={{
-                    aspectRatio,
+                    width: stageFit.width > 0 ? `${stageFit.width}px` : "100%",
+                    height: stageFit.height > 0 ? `${stageFit.height}px` : undefined,
+                    aspectRatio: `${stage.width} / ${stage.height}`,
+                    maxWidth: "100%",
+                    maxHeight: "100%",
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transition: dragRef.current ? undefined : "transform 120ms ease-out",
                   }}
@@ -856,9 +892,9 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                       <div className={`max-w-sm rounded-2xl px-5 py-5 text-sm backdrop-blur-md ${
                         dark ? "bg-slate-950/45 text-slate-100" : "bg-white/75 text-muted"
                       }`}>
-                        <p className="text-base font-bold text-current">等待第一批学员宠物入镜</p>
+                        <p className="text-base font-bold text-current">还没有宠物来合影</p>
                         <p className="mt-2 leading-6 opacity-90">
-                          全营纪念照只会收录学员提交的作品。有投稿并生成预览后，它们会按小组排成毕业合影。
+                          大家提交宠物后，就会自动出现在这里一起合影。
                         </p>
                       </div>
                     </div>
@@ -882,14 +918,6 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                       );
                     })
                   )}
-
-                  <div className="pointer-events-none absolute bottom-3 left-3 z-30 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm">
-                    {background.label} · {campPets.length} 只
-                    {shouldAnimate ? " · LIVE" : " · 定妆"}
-                  </div>
-                  <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm">
-                    VibeCoding · 全营纪念
-                  </div>
                 </div>
               </div>
 
@@ -958,10 +986,10 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                   className="rounded-full px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition hover:bg-white hover:text-brand"
                   onClick={resetView}
                 >
-                  复位
+                  回正
                 </button>
               </div>
-              <p className="text-xs text-muted">滚轮缩放 · 拖拽平移 · 点宠物认人</p>
+              <p className="text-xs text-muted">可以放大、拖动查看；点宠物能看是谁</p>
             </div>
 
             {message ? (
@@ -969,8 +997,8 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
             ) : (
               <p className="text-sm text-muted">
                 {campPets.length === 0
-                  ? "有学员投稿后即可导出全营纪念海报。"
-                  : "轻定制场景、标语、名牌或分组地毯后，导出高清 PNG 发朋友圈。"}
+                  ? "等有宠物入场后，就可以保存图片了。"
+                  : "调好看一点，再保存图片发朋友圈吧。"}
               </p>
             )}
 
@@ -981,7 +1009,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
                 disabled={!canExport}
                 onClick={exportPng}
               >
-                {busy ? "导出中…" : "导出 PNG"}
+                {busy ? "保存中…" : "导出 PNG"}
               </button>
               <button
                 type="button"
@@ -1055,7 +1083,7 @@ function CampStageBackdrop({
       />
       <canvas
         ref={canvasRef}
-        className={`photo-stage-canvas absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+        className={`photo-stage-canvas absolute inset-0 h-full w-full object-fill transition-opacity duration-500 ${
           ready ? "opacity-100" : "opacity-0"
         }`}
         width={width}

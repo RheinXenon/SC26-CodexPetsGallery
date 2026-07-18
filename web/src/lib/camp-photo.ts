@@ -32,8 +32,8 @@ export const CAMP_ASPECT_OPTIONS: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: "portrait", label: "长图", hint: "默认，手机发图更友好" },
-  { id: "landscape", label: "横版 16:9", hint: "横屏海报 / 大屏" },
+  { id: "portrait", label: "长图", hint: "适合发朋友圈" },
+  { id: "landscape", label: "横版 16:9", hint: "更宽的横图" },
 ];
 
 /** Design-time canvas sizes (export pixels). */
@@ -339,7 +339,7 @@ export async function composeCampPhoto({
   height?: number;
 }) {
   if (pets.length === 0) {
-    throw new Error("还没有学员宠物入镜");
+    throw new Error("还没有宠物可以合影");
   }
 
   const preset = CAMP_STAGE[aspect];
