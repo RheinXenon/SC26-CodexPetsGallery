@@ -72,14 +72,14 @@ export function HeroShowcase({ pets, eventName, submissionCount }: Props) {
             大家的宠物
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-7 text-slate-500 sm:text-base">
-            SummerCamp 学员创作的 Codex 精灵图鉴。浏览九态动画，分享喜欢的宠物，也可以挑选几只来张合影。
+            把你做的宠物放上来，逛逛大家的作品，挑几只一起拍张合影。
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <div className="rounded-full border border-white/80 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
               <span className="tabular-nums text-brand">{submissionCount}</span> 份学员作品
             </div>
             <div className="rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
-              九态动画 · 合影 · 深链分享
+              动画展示 · 一键合影 · 轻松分享
             </div>
           </div>
         </div>

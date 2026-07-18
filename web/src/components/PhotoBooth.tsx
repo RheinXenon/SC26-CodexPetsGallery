@@ -351,7 +351,7 @@ export function PhotoBooth({
         safeExternalUrl(pet.posterUrl) || safeExternalUrl(pet.previewUrl),
       );
       if (!hasDrawable) {
-        throw new Error("部分宠物缺少同源预览图，暂时无法合影");
+        throw new Error("有些宠物暂时没法合影，换几只试试");
       }
 
       // Freeze near the live stage moment; missing actors get a random frame.
@@ -364,7 +364,7 @@ export function PhotoBooth({
         poseByPetId,
       });
       await downloadCanvasPng(canvas, "sc26-pets-photo.png");
-      setMessage("已导出 PNG：抓取了当前舞台动作瞬间（每次可能略有不同）");
+      setMessage("合影已保存。想换姿势的话，再导一次就行。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "导出失败");
     } finally {
@@ -382,12 +382,12 @@ export function PhotoBooth({
         <header className="relative flex items-center justify-between gap-3 border-b border-line/80 px-4 py-4 sm:px-6">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/50 to-transparent" />
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand">Live Studio</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand">Photo Booth</p>
             <h2 className="truncate text-xl font-extrabold tracking-tight text-ink">宠物合影棚</h2>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full border border-line bg-canvas/80 px-3 py-1 text-xs font-semibold text-muted sm:inline-flex">
-              动态舞台 · 快门冻帧
+              实时预览 · 一键导出
             </span>
             <button
               type="button"
@@ -431,7 +431,7 @@ export function PhotoBooth({
               {panel === "cast" ? (
                 <>
                   <p className="text-sm leading-6 text-muted">
-                    在画廊勾选宠物，或按组一键加入。最多 {PHOTO_MAX} 只。舞台会错峰播放动画；导出 PNG 时抓取当前瞬间，每次动作可能不同。
+                    先在画廊点选宠物，或按组一键加入，最多 {PHOTO_MAX} 只。选好后在右侧舞台预览，再导出合影图。
                   </p>
 
                   <div className="flex flex-wrap items-end gap-2">
@@ -476,7 +476,7 @@ export function PhotoBooth({
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {selectedPets.length === 0 ? (
                         <div className="flex w-full items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/40 px-4 py-8 text-sm text-muted">
-                          还没有选择宠物。关闭面板后可在画廊勾选。
+                          还没选宠物。关掉这里，回画廊点选即可。
                         </div>
                       ) : selectedPets.map((pet, index) => (
                         <div
@@ -508,7 +508,7 @@ export function PhotoBooth({
               {panel === "scene" ? (
                 <>
                   <p className="text-sm leading-6 text-muted">
-                    每个预设都有独立氛围：天气粒子、装饰与导出画布绘制都会同步变化。
+                    换个背景试试氛围。导出的合影会和预览一致。
                   </p>
                   <div>
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -600,7 +600,7 @@ export function PhotoBooth({
                     </div>
                   </div>
                   <p className="text-xs leading-5 text-muted">
-                    自定义背景仅保存在本机当前会话，不会上传服务器。导出时按 cover 裁切铺满。
+                    也可以上传自己的背景图。换设备或刷新后需要重新上传。
                   </p>
                 </>
               ) : null}
@@ -608,7 +608,7 @@ export function PhotoBooth({
               {panel === "slogan" ? (
                 <div className="space-y-4">
                   <p className="text-sm leading-6 text-muted">
-                    自定义合影背景标语。舞台预览会实时更新，导出 PNG 时一并写入。
+                    给合影加一句标语。改完右侧会马上更新，导出时也会带上。
                   </p>
 
                   <label className="flex flex-col gap-1.5 text-sm">
@@ -704,7 +704,7 @@ export function PhotoBooth({
                   <div>
                     <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-muted">名牌内容</p>
                     <p className="mb-3 text-sm leading-6 text-muted">
-                      控制舞台与导出 PNG 里每只宠物下方显示什么。缺字段时会自动回退。
+                      选宠物脚下要不要显示名字，以及显示哪种名字。
                     </p>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {PHOTO_NAME_MODE_OPTIONS.map((option) => (
@@ -733,7 +733,7 @@ export function PhotoBooth({
                     <span className="font-semibold text-ink-soft">
                       {PHOTO_NAME_MODE_OPTIONS.find((item) => item.id === nameMode)?.label ?? "宠物名"}
                     </span>
-                    。示例宠物若没有 GitHub / 昵称，会回退到可用字段。
+                    。没有对应信息时，会改用宠物名。
                   </p>
                 </div>
               ) : null}
@@ -766,7 +766,7 @@ export function PhotoBooth({
                   <div className={`rounded-2xl px-5 py-4 text-sm backdrop-blur-md ${
                     dark ? "bg-slate-950/40 text-slate-200" : "bg-white/70 text-muted"
                   }`}>
-                    选择宠物后，这里会错峰播放合影动画
+                    选好宠物后，它们会出现在这里一起动起来
                   </div>
                 </div>
               ) : (
@@ -798,7 +798,7 @@ export function PhotoBooth({
               <p className="text-sm text-ink-soft" role="status">{message}</p>
             ) : (
               <p className="text-sm text-muted">
-                舞台实时动画会错开相位；导出 PNG 像快门一样冻住当前动作，多导几次细节会不同。
+                对好画面后点「导出 PNG」。多导几次，姿势可能略有不同，可以挑一张最喜欢的。
               </p>
             )}
 

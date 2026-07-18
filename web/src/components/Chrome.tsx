@@ -30,7 +30,7 @@ export function SiteHeader({
           </span>
           <span>
             <span className="block text-[15px] font-bold tracking-tight text-ink sm:text-base">{config.pageTitle}</span>
-            <span className="block text-xs text-muted">{submissionCount} 份学员作品 · 精灵图鉴</span>
+            <span className="block text-xs text-muted">{submissionCount} 份学员作品 · 宠物画廊</span>
           </span>
         </a>
 

@@ -68,7 +68,7 @@ export function App() {
       setAllPets([...submissions.pets, ...examples]);
 
       if (loadError) setStatus({ text: "部分数据加载失败，请稍后刷新页面。", error: true });
-      else if (submissions.pets.length === 0) setStatus({ text: "还没有真实投稿，先看看三个示例宠物。" });
+      else if (submissions.pets.length === 0) setStatus({ text: "还没有学员投稿，先看看下面的示例宠物，也欢迎上传你的宠物。" });
       else setStatus(null);
     }
 
@@ -200,7 +200,7 @@ export function App() {
 
           {selectMode ? (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand/15 bg-gradient-to-r from-brand-soft via-white to-brand-soft/80 px-4 py-3 text-sm text-brand-dark shadow-[0_10px_28px_rgba(59,130,246,0.08)]">
-              <span className="font-medium">合影选宠中：点击卡片勾选，最多 {PHOTO_MAX} 只。已选 <strong className="tabular-nums">{selectedIds.length}</strong> 只。</span>
+              <span className="font-medium">合影选宠中：点卡片加入合影，最多 {PHOTO_MAX} 只。已选 <strong className="tabular-nums">{selectedIds.length}</strong> 只。</span>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -250,14 +250,14 @@ export function App() {
 
       <footer className="border-t border-line/80 bg-white/50 py-8">
         <div className="shell flex flex-col gap-2 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-medium text-ink-soft">SC26 宠物画廊 · Light Dex</span>
+          <span className="font-medium text-ink-soft">SC26 宠物画廊</span>
           <span>
             {generatedAt
               ? `投稿更新于 ${new Intl.DateTimeFormat("zh-CN", {
                 dateStyle: "medium",
                 timeStyle: "short",
               }).format(new Date(generatedAt))}`
-              : "本地预览模式"}
+              : "欢迎上传你的宠物"}
           </span>
         </div>
       </footer>

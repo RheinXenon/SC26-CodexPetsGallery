@@ -1,7 +1,7 @@
 {
   "id": "hachiroku",
   "displayName": "Hachiroku",
-  "description": "穿着黑色列车长制服的像素风伙伴，精灵图包含移动和多种表情。",
+  "description": "穿着黑色列车长制服的像素风伙伴，包含移动和多种表情动作。",
   "spritesheetPath": "spritesheet.webp",
   "spriteGrid": {
     "formatVersion": "v1",

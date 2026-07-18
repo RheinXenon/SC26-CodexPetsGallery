@@ -1,7 +1,7 @@
 {
   "id": "bananacat",
   "displayName": "BananaCat",
-  "description": "穿着香蕉外套的橘猫，精灵图包含行走、待机和哭泣动作。",
+  "description": "穿着香蕉外套的橘猫，包含行走、待机和哭泣动作。",
   "spritesheetPath": "spritesheet.webp",
   "spriteGrid": {
     "formatVersion": "v1",

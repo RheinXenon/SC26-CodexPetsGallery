@@ -151,7 +151,7 @@ export class SpriteAnimator {
       if (this.destroyed) return;
 
       const frame = getFrameSize(this.image, this.grid);
-      if (frame.width < 1 || frame.height < 1) throw new Error("精灵图尺寸无效");
+      if (frame.width < 1 || frame.height < 1) throw new Error("宠物图尺寸无效");
       this.canvas.width = frame.width;
       this.canvas.height = frame.height;
       this.ready = true;

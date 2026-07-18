@@ -39,7 +39,7 @@ export async function loadExamples(): Promise<Pet[]> {
       if (!pet) throw new Error(`缺少示例 ${id}`);
       const spriteGrid = normalizeSpriteGrid(pet.spriteGrid ?? {});
       if (!validateSpriteGrid(spriteGrid)) {
-        throw new Error(`${pet.id || id} 的精灵图配置无效`);
+        throw new Error(`${pet.id || id} 的宠物图配置无效`);
       }
       return {
         kind: "example" as const,

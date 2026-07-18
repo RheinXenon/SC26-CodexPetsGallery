@@ -125,10 +125,10 @@ export const SLOGAN_POSITION_OPTIONS: Array<{ id: SloganPosition; label: string 
 ];
 
 export const PHOTO_NAME_MODE_OPTIONS: Array<{ id: PhotoNameMode; label: string; hint: string }> = [
-  { id: "hidden", label: "不显示", hint: "舞台与导出都不显示名牌" },
+  { id: "hidden", label: "不显示", hint: "宠物脚下不显示文字" },
   { id: "pet", label: "宠物名", hint: "显示宠物名称" },
-  { id: "github", label: "GitHub", hint: "显示 GitHub ID" },
-  { id: "nickname", label: "创作昵称", hint: "显示作者填写的昵称" },
+  { id: "github", label: "GitHub", hint: "显示作者的 GitHub 用户名" },
+  { id: "nickname", label: "创作昵称", hint: "显示作者昵称" },
 ];
 
 /** Resolve the nameplate text for a pet under the selected mode. */
@@ -1179,7 +1179,7 @@ function assertSameOriginDrawable(urlValue: string, petName: string) {
     && !url.protocol.startsWith("blob")
     && !url.protocol.startsWith("data")
   ) {
-    throw new Error(`${petName} 的预览图不是同源资源，无法安全导出`);
+    throw new Error(`${petName} 暂时没法导出，换一只试试`);
   }
   return url.href;
 }

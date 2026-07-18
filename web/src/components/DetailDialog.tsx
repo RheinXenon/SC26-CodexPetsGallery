@@ -230,7 +230,7 @@ export function DetailDialog({ pet, onClose }: Props) {
                 <h2 className="text-3xl font-extrabold tracking-tight">{pet.petName}</h2>
                 <p className="mt-2 text-sm text-muted">
                   {pet.kind === "example"
-                    ? "由项目示例资源提供"
+                    ? "官方示例宠物"
                     : `${pet.nickname} · @${pet.githubLogin}`}
                 </p>
                 <p className="mt-4 text-[15px] leading-7 text-ink-soft">{pet.description}</p>
@@ -252,29 +252,29 @@ export function DetailDialog({ pet, onClose }: Props) {
                   {pet.kind === "example" ? (
                     <>
                       <DetailLink label="查看宠物配置" href={pet.configUrl} />
-                      <DetailLink label="打开完整精灵图" href={pet.spriteUrl} />
+                      <DetailLink label="打开完整立绘" href={pet.spriteUrl} />
                     </>
                   ) : (
                     <>
                       <DetailLink label="作者的 GitHub 主页" href={pet.githubUrl} />
-                      <DetailLink label="查看原投稿 Issue" href={pet.issueUrl} />
+                      <DetailLink label="查看原投稿" href={pet.issueUrl} />
                     </>
                   )}
                 </div>
               </div>
 
               <details className="rounded-2xl border border-line bg-canvas/40 p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-ink-soft">创作者资源</summary>
+                <summary className="cursor-pointer text-sm font-semibold text-ink-soft">更多素材</summary>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {pet.kind === "example" ? (
                     <>
-                      <DetailLink label="pet.json" href={pet.configUrl} />
-                      <DetailLink label="spritesheet.webp" href={pet.spriteUrl} />
+                      <DetailLink label="宠物配置" href={pet.configUrl} />
+                      <DetailLink label="完整立绘" href={pet.spriteUrl} />
                     </>
                   ) : (
                     <>
-                      <DetailLink label="打开 pet.json" href={pet.petConfigUrl} />
-                      <DetailLink label="打开 spritesheet.webp" href={pet.spritesheetUrl} />
+                      <DetailLink label="宠物配置" href={pet.petConfigUrl} />
+                      <DetailLink label="完整立绘" href={pet.spritesheetUrl} />
                     </>
                   )}
                 </div>

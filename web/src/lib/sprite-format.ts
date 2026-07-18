@@ -69,10 +69,10 @@ export function resolveSpriteLayout(
   const rows = known?.rows ?? grid.rows;
 
   if (!Number.isInteger(columns) || !Number.isInteger(rows) || columns < 1 || rows < 1) {
-    throw new Error("精灵图网格配置无效");
+    throw new Error("宠物图网格配置无效");
   }
   if (image.naturalWidth % columns !== 0 || image.naturalHeight % rows !== 0) {
-    throw new Error("精灵图尺寸与网格配置不匹配");
+    throw new Error("宠物图尺寸与网格配置不匹配");
   }
 
   return {

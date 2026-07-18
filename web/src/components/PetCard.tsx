@@ -127,7 +127,7 @@ export function PetCard({
             </>
           ) : (
             <span className="truncate font-medium uppercase tracking-[0.04em] text-slate-400">
-              SC26 示例资源
+              SC26 示例
             </span>
           )}
         </span>
