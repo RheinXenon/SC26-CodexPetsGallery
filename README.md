@@ -88,7 +88,8 @@ gallery.config.json
 ## 投稿有效条件
 
 - Issue 开启且带 `pet-submission`
-- 标题含宠物名，昵称与介绍非空
+- 标题写成 `[宠物投稿] 宠物名`（`[宠物投稿]` 后必须有名字）
+- 昵称与介绍非空
 - 分组可空；填写时仅 1–33
 - 具名附件 `pet.json` + `spritesheet.webp`（GitHub 托管）
 - WebP 尺寸 v1/v2 合法且 ≤10 MB

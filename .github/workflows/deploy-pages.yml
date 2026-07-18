@@ -2,7 +2,7 @@ name: Build and deploy gallery
 
 on:
   issues:
-    types: [edited, deleted, closed, reopened, labeled, unlabeled]
+    types: [opened, edited, deleted, closed, reopened, labeled, unlabeled]
   workflow_dispatch:
   push:
     branches: [main]
@@ -16,6 +16,7 @@ on:
       - "package-lock.json"
 
 permissions:
+  actions: write
   contents: read
   issues: read
   pages: write

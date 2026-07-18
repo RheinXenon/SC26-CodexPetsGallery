@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  describeSubmissionRejection,
   extractAllowedUrl,
   extractFields,
   extractPetAttachments,
@@ -185,6 +186,20 @@ test("错误分组写法按未填写处理，不影响投稿有效性", () => {
 test("未确认公开展示和已关闭投稿会被丢弃", () => {
   assert.equal(parseSubmission(issue({ body: validBody().replace("[x]", "[ ]") })), null);
   assert.equal(parseSubmission(issue({ state: "closed" })), null);
+});
+
+test("拒绝原因会明确指出标题缺少宠物名", () => {
+  const incomplete = issue({ title: "[宠物投稿]" });
+  assert.equal(parseSubmission(incomplete), null);
+  assert.equal(
+    describeSubmissionRejection(incomplete),
+    "标题中缺少宠物名，请把名字写在「[宠物投稿]」后面",
+  );
+  assert.equal(
+    describeSubmissionRejection(issue({ body: validBody().replace("[x]", "[ ]") })),
+    "未勾选公开展示确认",
+  );
+  assert.equal(describeSubmissionRejection(issue()), null);
 });
 
 test("同一账号只保留最近更新的有效投稿", () => {

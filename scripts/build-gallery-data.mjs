@@ -134,28 +134,43 @@ export function extractPetName(title = "") {
   return cleanSingleLine(withoutPrefix, 80);
 }
 
-export function parseSubmission(issue) {
-  if (!issue || issue.pull_request || issue.state !== "open" || !issue.user?.login) return null;
+export function describeSubmissionRejection(issue) {
+  if (!issue || issue.pull_request) return "不是有效的投稿 Issue";
+  if (issue.state !== "open") return "投稿已关闭";
+  if (!issue.user?.login) return "缺少投稿账号信息";
 
   const fields = extractFields(issue.body ?? "");
   const petName = extractPetName(issue.title ?? "");
   const nickname = cleanSingleLine(fields[FIELD_LABELS.nickname] ?? "", 50);
-  const group = normalizeGroupNumber(fields[FIELD_LABELS.group]);
   const description = cleanSingleLine(fields[FIELD_LABELS.description] ?? "", 160);
-  const attachments = extractPetAttachments(fields[FIELD_LABELS.files]);
+  const attachments = extractPetAttachments(fields[FIELD_LABELS.files] ?? "");
   const hasConsent = /-\s*\[x\]/i.test(fields[FIELD_LABELS.consent] ?? "");
 
-  if (!petName || !nickname || !description || !attachments || !hasConsent) return null;
+  if (!petName) {
+    return "标题中缺少宠物名，请把名字写在「[宠物投稿]」后面";
+  }
+  if (!nickname) return "缺少学员昵称";
+  if (!description) return "缺少一句话介绍";
+  if (!attachments) {
+    return "宠物文件不完整，需要同时包含 pet.json 和 spritesheet.webp 附件";
+  }
+  if (!hasConsent) return "未勾选公开展示确认";
+  return null;
+}
 
+export function parseSubmission(issue) {
+  if (describeSubmissionRejection(issue)) return null;
+
+  const fields = extractFields(issue.body ?? "");
   return {
     issueNumber: issue.number,
-    petName,
-    nickname,
-    group,
-    description,
+    petName: extractPetName(issue.title ?? ""),
+    nickname: cleanSingleLine(fields[FIELD_LABELS.nickname] ?? "", 50),
+    group: normalizeGroupNumber(fields[FIELD_LABELS.group]),
+    description: cleanSingleLine(fields[FIELD_LABELS.description] ?? "", 160),
     githubLogin: issue.user.login,
     githubUrl: `https://github.com/${encodeURIComponent(issue.user.login)}`,
-    ...attachments,
+    ...extractPetAttachments(fields[FIELD_LABELS.files] ?? ""),
     issueUrl: issue.html_url,
     updatedAt: issue.updated_at,
   };
@@ -306,10 +321,17 @@ export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir
   return previewAssets;
 }
 
+function attachmentRequestHeaders(token, accept) {
+  const headers = { Accept: accept };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 export async function hydrateSubmission(submission, {
   fetchImpl = fetch,
   getCachedMedia,
   createPreviewAssets,
+  token,
 } = {}) {
   try {
     const cachedMedia = await getCachedMedia?.(submission);
@@ -322,7 +344,8 @@ export async function hydrateSubmission(submission, {
     }
 
     const response = await fetchImpl(submission.spritesheetUrl, {
-      headers: { Accept: "image/webp" },
+      headers: attachmentRequestHeaders(token, "image/webp"),
+      redirect: "follow",
     });
     if (!response.ok) return null;
 
@@ -383,6 +406,7 @@ export async function selectLatestValidSubmissions(
     getCachedMedia,
     createPreviewAssets,
     concurrency = DEFAULT_BUILD_CONCURRENCY,
+    token,
   } = {},
 ) {
   const sorted = [...issues].sort(
@@ -391,6 +415,11 @@ export async function selectLatestValidSubmissions(
   const candidatesByAccount = new Map();
 
   for (const issue of sorted) {
+    const rejection = describeSubmissionRejection(issue);
+    if (rejection) {
+      onRejected(issue, rejection);
+      continue;
+    }
     const candidate = parseSubmission(issue);
     if (!candidate) {
       onRejected(issue, "表单字段、附件或公开展示确认不完整");
@@ -422,6 +451,7 @@ export async function selectLatestValidSubmissions(
             fetchImpl,
             getCachedMedia,
             createPreviewAssets,
+            token,
           });
           if (submission) {
             selected[groupIndex] = submission;
@@ -534,6 +564,7 @@ export async function buildGalleryData({
   const rejected = [];
   const pets = await selectLatestValidSubmissions(issues, {
     fetchImpl,
+    token,
     onRejected: (issue, reason) => rejected.push({ number: issue.number, reason }),
     getCachedMedia: async (submission) => {
       const cached = previewCache.entries[submission.spritesheetUrl];
