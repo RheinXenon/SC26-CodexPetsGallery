@@ -8,6 +8,7 @@ type HeaderProps = {
   selectedCount: number;
   onToggleSelectMode: () => void;
   onOpenPhotoBooth: () => void;
+  onOpenCampPhoto: () => void;
 };
 
 export function SiteHeader({
@@ -17,6 +18,7 @@ export function SiteHeader({
   selectedCount,
   onToggleSelectMode,
   onOpenPhotoBooth,
+  onOpenCampPhoto,
 }: HeaderProps) {
   const submitHref = `https://github.com/${config.repository}/issues/new?template=pet-submission.yml`;
 
@@ -52,6 +54,13 @@ export function SiteHeader({
             onClick={onOpenPhotoBooth}
           >
             打开合影
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-50 to-violet-50 px-3.5 py-2 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:shadow-[0_8px_18px_rgba(245,158,11,0.16)] active:scale-[0.98]"
+            onClick={onOpenCampPhoto}
+          >
+            全营纪念照
           </button>
           <a
             className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_10px_22px_rgba(59,130,246,0.28)] transition hover:bg-brand-dark hover:shadow-[0_14px_28px_rgba(59,130,246,0.34)] active:scale-[0.98]"

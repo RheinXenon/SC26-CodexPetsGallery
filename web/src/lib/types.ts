@@ -65,7 +65,8 @@ export type PhotoSceneFx =
   | "dusk"
   | "neon-rain"
   | "starry"
-  | "sakura";
+  | "sakura"
+  | "ceremony";
 
 export type PhotoBackground =
   | {

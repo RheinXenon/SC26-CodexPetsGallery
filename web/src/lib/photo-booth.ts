@@ -97,6 +97,17 @@ export const PHOTO_BACKGROUNDS: PhotoBackground[] = [
     accent: "#fb7185",
     fx: "sakura",
   },
+  {
+    id: "ceremony",
+    label: "典礼",
+    type: "gradient",
+    from: "#1e1b4b",
+    mid: "#4c1d95",
+    to: "#7c3aed",
+    accent: "#fbbf24",
+    dark: true,
+    fx: "ceremony",
+  },
 ];
 
 export const DEFAULT_SLOGAN: PhotoSlogan = {
@@ -870,6 +881,156 @@ function paintSakuraScene(
   paintGround(ctx, width, height, false, "rgba(190, 24, 93, 0.1)");
 }
 
+/** Full-camp memorial default: ceremonial hall / closing-night stage. */
+function paintCeremonyScene(
+  ctx: CanvasRenderingContext2D,
+  bg: Extract<PhotoBackground, { type: "gradient" }>,
+  width: number,
+  height: number,
+) {
+  paintBaseGradient(ctx, bg, width, height);
+
+  // Deep stage wash
+  const wash = ctx.createRadialGradient(
+    width * 0.5,
+    height * 0.42,
+    width * 0.08,
+    width * 0.5,
+    height * 0.55,
+    width * 0.72,
+  );
+  wash.addColorStop(0, "rgba(251, 191, 36, 0.22)");
+  wash.addColorStop(0.45, "rgba(167, 139, 250, 0.18)");
+  wash.addColorStop(1, "rgba(15, 23, 42, 0)");
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, 0, width, height);
+
+  // Soft spotlight cones
+  for (const [cx, alpha] of [
+    [0.22, 0.16],
+    [0.5, 0.22],
+    [0.78, 0.16],
+  ] as const) {
+    const cone = ctx.createLinearGradient(width * cx, height * 0.02, width * cx, height * 0.72);
+    cone.addColorStop(0, `rgba(254, 243, 199, ${alpha})`);
+    cone.addColorStop(0.55, `rgba(251, 191, 36, ${alpha * 0.35})`);
+    cone.addColorStop(1, "rgba(251, 191, 36, 0)");
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.moveTo(width * (cx - 0.08), 0);
+    ctx.lineTo(width * (cx + 0.08), 0);
+    ctx.lineTo(width * (cx + 0.18), height * 0.78);
+    ctx.lineTo(width * (cx - 0.18), height * 0.78);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Side curtains
+  const curtain = (side: "left" | "right") => {
+    const x0 = side === "left" ? 0 : width;
+    const dir = side === "left" ? 1 : -1;
+    ctx.save();
+    const g = ctx.createLinearGradient(x0, 0, x0 + dir * width * 0.18, 0);
+    g.addColorStop(0, "rgba(76, 29, 149, 0.92)");
+    g.addColorStop(0.55, "rgba(91, 33, 182, 0.55)");
+    g.addColorStop(1, "rgba(91, 33, 182, 0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x0, 0);
+    ctx.lineTo(x0 + dir * width * 0.14, 0);
+    ctx.quadraticCurveTo(
+      x0 + dir * width * 0.2,
+      height * 0.35,
+      x0 + dir * width * 0.12,
+      height,
+    );
+    ctx.lineTo(x0, height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Fold lines
+    ctx.strokeStyle = "rgba(251, 191, 36, 0.12)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i += 1) {
+      const fx = x0 + dir * width * (0.03 + i * 0.028);
+      ctx.beginPath();
+      ctx.moveTo(fx, 0);
+      ctx.bezierCurveTo(
+        fx + dir * 10,
+        height * 0.25,
+        fx - dir * 8,
+        height * 0.55,
+        fx + dir * 6,
+        height,
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+  curtain("left");
+  curtain("right");
+
+  // Top valance / arch ribbon
+  const valance = ctx.createLinearGradient(0, 0, 0, height * 0.18);
+  valance.addColorStop(0, "rgba(49, 16, 89, 0.92)");
+  valance.addColorStop(0.7, "rgba(76, 29, 149, 0.55)");
+  valance.addColorStop(1, "rgba(76, 29, 149, 0)");
+  ctx.fillStyle = valance;
+  ctx.fillRect(0, 0, width, height * 0.18);
+
+  ctx.fillStyle = "rgba(251, 191, 36, 0.55)";
+  ctx.beginPath();
+  ctx.moveTo(width * 0.18, height * 0.015);
+  ctx.quadraticCurveTo(width * 0.5, height * 0.07, width * 0.82, height * 0.015);
+  ctx.lineTo(width * 0.82, height * 0.035);
+  ctx.quadraticCurveTo(width * 0.5, height * 0.09, width * 0.18, height * 0.035);
+  ctx.closePath();
+  ctx.fill();
+
+  // Floating sparkles
+  for (let i = 0; i < 36; i += 1) {
+    const x = unit(i * 17 + 2) * width;
+    const y = unit(i * 29 + 5) * height * 0.55;
+    const r = 1.2 + unit(i * 7) * 2.4;
+    ctx.globalAlpha = 0.35 + unit(i * 11) * 0.55;
+    ctx.fillStyle = unit(i * 3) > 0.55 ? "#fde68a" : "#f5d0fe";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Tiered stage floor
+  paintGround(ctx, width, height, true, "rgba(15, 23, 42, 0.55)");
+  const stageTop = height * 0.72;
+  const stageGrad = ctx.createLinearGradient(0, stageTop, 0, height);
+  stageGrad.addColorStop(0, "rgba(30, 27, 75, 0.15)");
+  stageGrad.addColorStop(0.35, "rgba(49, 46, 129, 0.55)");
+  stageGrad.addColorStop(1, "rgba(15, 23, 42, 0.82)");
+  ctx.fillStyle = stageGrad;
+  ctx.beginPath();
+  ctx.moveTo(width * 0.04, height);
+  ctx.lineTo(width * 0.1, stageTop);
+  ctx.lineTo(width * 0.9, stageTop);
+  ctx.lineTo(width * 0.96, height);
+  ctx.closePath();
+  ctx.fill();
+
+  // Gold edge on stage lip
+  ctx.strokeStyle = "rgba(251, 191, 36, 0.55)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(width * 0.1, stageTop);
+  ctx.lineTo(width * 0.9, stageTop);
+  ctx.stroke();
+
+  // Soft footlights
+  for (let i = 0; i < 7; i += 1) {
+    const lx = width * (0.18 + i * 0.11);
+    paintSoftOrb(ctx, lx, stageTop + 8, 28, 12, "rgba(253, 224, 71, 0.55)", 0.45);
+  }
+}
+
 /** Paint a full scene (or custom image) onto a canvas — shared by export + live stage. */
 export function paintSceneBackground(
   ctx: CanvasRenderingContext2D,
@@ -934,6 +1095,9 @@ function fillBackground(
         break;
       case "sakura":
         paintSakuraScene(ctx, background, width, height);
+        break;
+      case "ceremony":
+        paintCeremonyScene(ctx, background, width, height);
         break;
       default: {
         paintBaseGradient(ctx, background, width, height);
@@ -1026,6 +1190,17 @@ export function backgroundStyle(bg: PhotoBackground): Record<string, string> {
           linear-gradient(180deg, ${bg.from} 0%, ${mid} 48%, ${bg.to} 100%)
         `,
       };
+    case "ceremony":
+      return {
+        backgroundImage: `
+          radial-gradient(ellipse 40% 55% at 22% 0%, rgba(254,243,199,0.28), transparent 60%),
+          radial-gradient(ellipse 45% 60% at 50% 0%, rgba(251,191,36,0.22), transparent 62%),
+          radial-gradient(ellipse 40% 55% at 78% 0%, rgba(254,243,199,0.28), transparent 60%),
+          radial-gradient(ellipse 70% 40% at 50% 70%, rgba(167,139,250,0.25), transparent 65%),
+          linear-gradient(90deg, rgba(76,29,149,0.85) 0%, transparent 18%, transparent 82%, rgba(76,29,149,0.85) 100%),
+          linear-gradient(180deg, #1e1b4b 0%, ${mid} 45%, #0f172a 100%)
+        `,
+      };
     default:
       return {
         backgroundImage: `
@@ -1059,7 +1234,7 @@ function sloganAnchor(position: SloganPosition, width: number, height: number, b
   }
 }
 
-function drawSlogan(
+export function drawSlogan(
   ctx: CanvasRenderingContext2D,
   slogan: PhotoSlogan,
   width: number,
@@ -1184,7 +1359,7 @@ function assertSameOriginDrawable(urlValue: string, petName: string) {
   return url.href;
 }
 
-async function loadPetPoseSource(pet: Pet, preferredFrame?: number) {
+export async function loadPetPoseSource(pet: Pet, preferredFrame?: number) {
   const preview = getPreviewPlayback(pet);
   if (preview) {
     try {
@@ -1216,7 +1391,7 @@ async function loadPetPoseSource(pet: Pet, preferredFrame?: number) {
   };
 }
 
-function drawPetPose(
+export function drawPetPose(
   ctx: CanvasRenderingContext2D,
   pose: Awaited<ReturnType<typeof loadPetPoseSource>>,
   slot: { x: number; y: number; size: number },
@@ -1341,6 +1516,18 @@ export async function composeGroupPhoto({
   ctx.fillText("SC26 宠物画廊", 36, height - 28);
 
   return canvas;
+}
+
+/** Foreground rain overlay for neon-rain scenes (after pets). */
+export function paintForegroundSceneFx(
+  ctx: CanvasRenderingContext2D,
+  background: PhotoBackground,
+  width: number,
+  height: number,
+) {
+  if (resolveSceneFx(background) === "neon-rain") {
+    paintWindowRainOverlay(ctx, width, height);
+  }
 }
 
 export async function downloadCanvasPng(canvas: HTMLCanvasElement, filename: string) {

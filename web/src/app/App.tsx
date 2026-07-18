@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { CampPhoto } from "../components/CampPhoto";
 import { GalleryTools, Pagination, SiteHeader } from "../components/Chrome";
 import { DetailDialog } from "../components/DetailDialog";
 import { HeroShowcase } from "../components/HeroShowcase";
@@ -31,6 +32,7 @@ export function App() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [campPhotoOpen, setCampPhotoOpen] = useState(false);
   const toolsAnchorRef = useRef<HTMLDivElement>(null);
   const cardFocusRef = useRef<string | null>(null);
 
@@ -159,6 +161,7 @@ export function App() {
           setSelectMode(true);
           setPhotoOpen(true);
         }}
+        onOpenCampPhoto={() => setCampPhotoOpen(true)}
       />
 
       <main>
@@ -270,6 +273,11 @@ export function App() {
         onClose={() => setPhotoOpen(false)}
         onChangeSelected={setSelectedIds}
         onExitSelectMode={() => setSelectMode(false)}
+      />
+      <CampPhoto
+        open={campPhotoOpen}
+        allPets={allPets}
+        onClose={() => setCampPhotoOpen(false)}
       />
     </div>
   );
