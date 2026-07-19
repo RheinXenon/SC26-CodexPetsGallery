@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { SpriteAnimator, getDefaultState, reduceMotion, requestImage, safeExternalUrl } from "../lib/media";
+import { SpriteAnimator, getDefaultState, loadSpriteImage, reduceMotion, safeExternalUrl } from "../lib/media";
 import type { DensityMode, Pet } from "../lib/types";
 
 type Props = {
@@ -73,30 +73,26 @@ export function CardPreview({
     const state = getDefaultState(pet.spriteGrid);
 
     const activate = () => {
-      if (reduceMotion || animator || !previewUrl) return;
+      if (reduceMotion || animator || !previewUrl || !state) return;
       canvas = document.createElement("canvas");
-      // Bitmap stays low-res; CSS scales it up to fill the media box.
+      // Canvas size is corrected from the sheet on load; CSS scales the frame.
       canvas.className = [
         "sprite-canvas pixelated absolute inset-0 m-auto",
         "h-full w-auto max-w-full opacity-0 transition-opacity duration-300",
         "drop-shadow-[0_14px_22px_rgba(15,23,42,0.14)]",
       ].join(" ");
-      canvas.width = Number(pet.previewFrameWidth) || 96;
-      canvas.height = Number(pet.previewFrameHeight) || 104;
+      canvas.width = Number(pet.previewFrameWidth) || 192;
+      canvas.height = Number(pet.previewFrameHeight) || 208;
       canvas.setAttribute("role", "img");
       canvas.setAttribute("aria-label", `${pet.petName} 的${state.label}状态动画`);
       host.append(canvas);
       animator = new SpriteAnimator({
         canvas,
         url: previewUrl,
-        grid: {
-          columns: state.frames,
-          rows: 1,
-          defaultState: state.id,
-          states: [{ ...state, row: 0 }],
-        },
-        state: { ...state, row: 0 },
-        imageLoader: requestImage,
+        grid: pet.spriteGrid,
+        state,
+        // Share the in-memory sheet cache with the detail dialog.
+        imageLoader: loadSpriteImage,
         onReady: () => {
           canvas?.classList.add("opacity-100");
           setAnimated(true);

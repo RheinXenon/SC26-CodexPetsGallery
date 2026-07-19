@@ -1324,25 +1324,19 @@ export function createActorMotion(petId: string, salt = Math.random()) {
   };
 }
 
-/** Resolve the single-row preview grid used by gallery cards / photo booth. */
+/** Resolve playback for gallery cards / photo booth (full-grid q90 sheet). */
 export function getPreviewPlayback(pet: Pet): {
   url: string;
   grid: SpriteGrid;
   state: SpriteState;
 } | null {
-  const url = safeExternalUrl(pet.previewUrl);
+  const url = safeExternalUrl(pet.previewUrl) ?? safeExternalUrl(pet.detailUrl);
   if (!url) return null;
-  const base = getDefaultState(pet.spriteGrid);
-  if (!base) return null;
-  const state: SpriteState = { ...base, row: 0 };
+  const state = getDefaultState(pet.spriteGrid);
+  if (!state) return null;
   return {
     url,
-    grid: {
-      columns: Math.max(1, state.frames),
-      rows: 1,
-      defaultState: state.id,
-      states: [state],
-    },
+    grid: pet.spriteGrid,
     state,
   };
 }

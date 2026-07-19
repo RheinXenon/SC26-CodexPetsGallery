@@ -41,8 +41,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .gallery-cache
-          key: gallery-previews-v2-${{ github.run_id }}
+          key: gallery-previews-v3-${{ github.run_id }}
           restore-keys: |
+            gallery-previews-v3-
             gallery-previews-v2-
             gallery-previews-v1-
       - name: Build gallery data

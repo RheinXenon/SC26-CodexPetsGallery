@@ -62,9 +62,8 @@ GitHub Actions：校验 → 生成预览/详情图 → Vite 构建 → 部署 Pa
 - **前端**：Vite + Preact + TypeScript + Tailwind → 纯静态
 - **数据**：Actions 读带标签的 Issue，写出 `pets.json` / `previews.json`
 - **图片流水线**（`scripts/build-gallery-data.mjs`，内容 hash + `.gallery-cache` 增量）：
-  - `poster`：默认状态单帧，列表静帧
-  - `preview`：默认状态低分辨率条，列表动画
-  - `detail`：全分辨率有损 WebP（q90），详情播放
+  - `poster`：默认状态单帧（lossless WebP），列表静帧 / 合影导出
+  - `sheet`：全分辨率有损 WebP（q90），列表动画与详情共用（`previewUrl` = `detailUrl`）
 - 原 `spritesheet.webp` 仍指向 GitHub 附件，不打进 Pages 大图
 
 ### 目录
@@ -117,7 +116,7 @@ npm run build:data
 3. 推送 `main`，Pages 来源选 **GitHub Actions**
 4. 用「提交我的宠物」试投一条
 
-工作流：`npm ci` → `build-gallery-data` → `vite build` → 上传 `dist/`。图片缓存键为 `gallery-previews-v2-`。
+工作流：`npm ci` → `build-gallery-data` → `vite build` → 上传 `dist/`。图片缓存键为 `gallery-previews-v3-`。
 
 ### 迁到正式仓库
 

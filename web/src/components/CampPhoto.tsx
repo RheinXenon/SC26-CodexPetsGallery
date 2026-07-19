@@ -30,7 +30,7 @@ import {
   resolveSceneFx,
   sloganPositionClass,
 } from "../lib/photo-booth";
-import { SpriteAnimator, reduceMotion, requestImage, safeExternalUrl } from "../lib/media";
+import { SpriteAnimator, loadSpriteImage, reduceMotion, requestImage, safeExternalUrl } from "../lib/media";
 import type {
   Pet,
   PhotoBackground,
@@ -122,8 +122,8 @@ function CampActor({
       "opacity-0 transition-opacity duration-300",
       "drop-shadow-[0_10px_14px_rgba(15,23,42,0.28)]",
     ].join(" ");
-    canvas.width = Number(pet.previewFrameWidth) || 96;
-    canvas.height = Number(pet.previewFrameHeight) || 104;
+    canvas.width = Number(pet.previewFrameWidth) || 192;
+    canvas.height = Number(pet.previewFrameHeight) || 208;
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", `${pet.petName}`);
     host.append(canvas);
@@ -133,7 +133,7 @@ function CampActor({
       url: playback.url,
       grid: playback.grid,
       state: playback.state,
-      imageLoader: requestImage,
+      imageLoader: loadSpriteImage,
       startFrame: motion.startFrame,
       speed: motion.speed,
       phaseOffsetMs: motion.phaseOffsetMs,

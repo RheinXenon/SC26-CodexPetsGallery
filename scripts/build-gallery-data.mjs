@@ -16,12 +16,10 @@ const FIELD_LABELS = {
 
 const PET_TITLE_PREFIX = "[宠物投稿]";
 const MAX_SPRITE_BYTES = 10 * 1024 * 1024;
-// v2: also emit a full-resolution lossy detail sheet for the dialog player.
-const PREVIEW_PIPELINE_VERSION = "v2";
-const PREVIEW_FRAME_WIDTH = 96;
-const PREVIEW_FRAME_HEIGHT = 104;
-const DETAIL_WEBP_QUALITY = 90;
-const DETAIL_WEBP_ALPHA_QUALITY = 100;
+// v3: list preview and detail share one full-resolution lossy WebP sheet (q90).
+const PREVIEW_PIPELINE_VERSION = "v3";
+const SHEET_WEBP_QUALITY = 90;
+const SHEET_WEBP_ALPHA_QUALITY = 100;
 const DEFAULT_BUILD_CONCURRENCY = 4;
 const EXPECTED_SPRITE_FORMATS = new Map([
   ["1536x1872", { formatVersion: "v1", rows: 9 }],
@@ -250,24 +248,22 @@ async function materializePreviewAssets(rootDir, previewAssets) {
   const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
   const publishedDir = path.join(rootDir, "web", "public", "generated", "previews");
   const posterName = path.posix.basename(previewAssets.posterUrl);
-  const previewName = path.posix.basename(previewAssets.previewUrl);
-  const detailName = path.posix.basename(previewAssets.detailUrl);
+  // previewUrl and detailUrl share one full-resolution q90 sheet.
+  const sheetNames = [...new Set([
+    path.posix.basename(previewAssets.previewUrl),
+    path.posix.basename(previewAssets.detailUrl),
+  ])];
   const cachedPoster = path.join(cacheDir, posterName);
-  const cachedPreview = path.join(cacheDir, previewName);
-  const cachedDetail = path.join(cacheDir, detailName);
-  if (
-    !await fileExists(cachedPoster)
-    || !await fileExists(cachedPreview)
-    || !await fileExists(cachedDetail)
-  ) {
-    return false;
+  const cachedSheets = sheetNames.map((name) => path.join(cacheDir, name));
+  if (!await fileExists(cachedPoster)) return false;
+  for (const cachedSheet of cachedSheets) {
+    if (!await fileExists(cachedSheet)) return false;
   }
 
   await mkdir(publishedDir, { recursive: true });
   await Promise.all([
     copyFile(cachedPoster, path.join(publishedDir, posterName)),
-    copyFile(cachedPreview, path.join(publishedDir, previewName)),
-    copyFile(cachedDetail, path.join(publishedDir, detailName)),
+    ...sheetNames.map((name) => copyFile(path.join(cacheDir, name), path.join(publishedDir, name))),
   ]);
   return true;
 }
@@ -289,12 +285,11 @@ export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir
     .digest("hex")
     .slice(0, 16);
   const posterName = previewFileName(petId, digest, "poster");
-  const previewName = previewFileName(petId, digest, "preview");
-  const detailName = previewFileName(petId, digest, "detail");
+  // One full-grid lossy sheet is reused by list cards and the detail dialog.
+  const sheetName = previewFileName(petId, digest, "sheet");
   const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
   const cachedPoster = path.join(cacheDir, posterName);
-  const cachedPreview = path.join(cacheDir, previewName);
-  const cachedDetail = path.join(cacheDir, detailName);
+  const cachedSheet = path.join(cacheDir, sheetName);
   await mkdir(cacheDir, { recursive: true });
 
   const top = defaultState.row * frameHeight;
@@ -306,46 +301,26 @@ export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir
         .webp({ lossless: true, effort: 6 })
         .toFile(cachedPoster)
   ));
-  const previewTask = fileExists(cachedPreview).then((exists) => (
-    exists
-      ? null
-      : sharp(source)
-        .extract({
-          left: 0,
-          top,
-          width: defaultState.frames * frameWidth,
-          height: frameHeight,
-        })
-        .resize({
-          width: defaultState.frames * PREVIEW_FRAME_WIDTH,
-          height: PREVIEW_FRAME_HEIGHT,
-          fit: "fill",
-          kernel: sharp.kernel.nearest,
-        })
-        .webp({ lossless: true, effort: 6 })
-        .toFile(cachedPreview)
-  ));
-  // Full-resolution lossy sheet for the detail dialog: same grid/frames as the
-  // original, much smaller than author uploads, cached by content hash.
-  const detailTask = fileExists(cachedDetail).then((exists) => (
+  const sheetTask = fileExists(cachedSheet).then((exists) => (
     exists
       ? null
       : sharp(source)
         .webp({
-          quality: DETAIL_WEBP_QUALITY,
-          alphaQuality: DETAIL_WEBP_ALPHA_QUALITY,
+          quality: SHEET_WEBP_QUALITY,
+          alphaQuality: SHEET_WEBP_ALPHA_QUALITY,
           effort: 6,
         })
-        .toFile(cachedDetail)
+        .toFile(cachedSheet)
   ));
-  await Promise.all([posterTask, previewTask, detailTask]);
+  await Promise.all([posterTask, sheetTask]);
 
+  const sheetUrl = `generated/previews/${sheetName}`;
   const previewAssets = {
     posterUrl: `generated/previews/${posterName}`,
-    previewUrl: `generated/previews/${previewName}`,
-    detailUrl: `generated/previews/${detailName}`,
-    previewFrameWidth: PREVIEW_FRAME_WIDTH,
-    previewFrameHeight: PREVIEW_FRAME_HEIGHT,
+    previewUrl: sheetUrl,
+    detailUrl: sheetUrl,
+    previewFrameWidth: frameWidth,
+    previewFrameHeight: frameHeight,
   };
   await materializePreviewAssets(rootDir, previewAssets);
   return previewAssets;
