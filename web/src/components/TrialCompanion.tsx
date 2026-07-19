@@ -4,18 +4,15 @@ import { SpriteAnimator, getDetailPlaybackUrl } from "../lib/media";
 import {
   TRIAL_DRAG_THRESHOLD_PX,
   TRIAL_IDLE_WAIT_MS,
-  TRIAL_MULTI_CLICK_WINDOW_MS,
   clampTrialPosition,
   clampTrialScaleStep,
   defaultTrialPosition,
-  listEggStates,
   nextTapAnimation,
   onceDurationMs,
-  pickEggState,
-  registerClickBurst,
   resolveTrialState,
   runDirectionFromDelta,
   trialScaleHeight,
+  type TrialLogicalState,
   type TrialPoint,
   type TrialScaleStep,
 } from "../lib/trial-companion";
@@ -47,8 +44,23 @@ type TrialBubble = {
   body: string;
 };
 
+type SpecialAction = {
+  logical: Extract<TrialLogicalState, "failed" | "review" | "running">;
+  icon: string;
+  label: string;
+};
+
 const BUBBLE_HOLD_MS = 4200;
 const GREETING_HOLD_MS = 5200;
+
+const CHROME_BTN_CLASS =
+  "grid h-7 w-7 place-items-center rounded-full border border-line bg-white/95 text-sm font-bold text-ink-soft shadow-sm transition hover:border-brand/40 hover:text-brand disabled:opacity-40";
+
+const SPECIAL_ACTIONS: readonly SpecialAction[] = [
+  { logical: "failed", icon: "!", label: "播放失败动作" },
+  { logical: "review", icon: "◎", label: "播放审阅动作" },
+  { logical: "running", icon: "↻", label: "播放处理中动作" },
+];
 
 function clearTimer(ref: { current: number | null }) {
   if (ref.current !== null) {
@@ -85,11 +97,8 @@ export function TrialCompanion({
   const animatorRef = useRef<SpriteAnimator | null>(null);
   const onceTimerRef = useRef<number | null>(null);
   const idleTimerRef = useRef<number | null>(null);
-  const singleClickTimerRef = useRef<number | null>(null);
   const dragRef = useRef<DragSession | null>(null);
-  const burstRef = useRef({ count: 0, lastAt: 0 });
   const lastTapRef = useRef<"waving" | "jumping" | null>(null);
-  const lastEggIdRef = useRef<string | null>(null);
   const positionRef = useRef<TrialPoint | null>(position);
   const sizeRef = useRef({ width: trialScaleHeight(scaleStep), height: trialScaleHeight(scaleStep) });
   const petRef = useRef(pet);
@@ -103,6 +112,15 @@ export function TrialCompanion({
 
   const maxHeight = trialScaleHeight(scaleStep);
   petRef.current = pet;
+  const specialActions = SPECIAL_ACTIONS.map((action) => ({
+    ...action,
+    available: Boolean(resolveTrialState(pet.spriteGrid, action.logical)),
+  }));
+  const hasSpecialActions = specialActions.some((action) => action.available);
+  const chromeVisible = chromeSticky || chromePulse;
+  const chromeRevealClass = chromeVisible
+    ? "opacity-100"
+    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
 
   useEffect(() => {
     positionRef.current = position;
@@ -120,9 +138,7 @@ export function TrialCompanion({
     animatorRef.current = null;
     clearTimer(onceTimerRef);
     clearTimer(idleTimerRef);
-    clearTimer(singleClickTimerRef);
     clearTimer(bubbleTimerRef);
-    burstRef.current = { count: 0, lastAt: 0 };
     lastTapRef.current = null;
     setLoadError(false);
     setBubble(null);
@@ -179,7 +195,6 @@ export function TrialCompanion({
     return () => {
       clearTimer(onceTimerRef);
       clearTimer(idleTimerRef);
-      clearTimer(singleClickTimerRef);
       clearTimer(chromePulseTimerRef);
       clearTimer(bubbleTimerRef);
       animator.destroy();
@@ -285,17 +300,13 @@ export function TrialCompanion({
     playOnce(state, idle);
   }
 
-  function applyEgg() {
+  function applySpecial(logical: SpecialAction["logical"]) {
     const grid = petRef.current.spriteGrid;
-    const eggs = listEggStates(grid);
-    const picked = pickEggState(eggs, lastEggIdRef.current);
+    const state = resolveTrialState(grid, logical);
     const idle = resolveTrialState(grid, "idle");
-    if (!picked) {
-      applyTap();
-      return;
-    }
-    lastEggIdRef.current = picked.id;
-    playOnce(picked, idle);
+    if (!state) return;
+    bumpActivity();
+    playOnce(state, idle);
   }
 
   function handlePointerDown(event: JSX.TargetedPointerEvent<HTMLDivElement>) {
@@ -337,8 +348,6 @@ export function TrialCompanion({
     if (!session.dragging) {
       if (Math.hypot(dx, dy) < TRIAL_DRAG_THRESHOLD_PX) return;
       session.dragging = true;
-      clearTimer(singleClickTimerRef);
-      burstRef.current = { count: 0, lastAt: 0 };
     }
 
     const next = clampTrialPosition(
@@ -377,7 +386,7 @@ export function TrialCompanion({
       return;
     }
 
-    // Coarse pointers have no hover; briefly reveal chrome so × / ± are discoverable.
+    // Coarse pointers have no hover; briefly reveal chrome so controls are discoverable.
     if (event.pointerType !== "mouse") {
       setChromePulse(true);
       clearTimer(chromePulseTimerRef);
@@ -387,24 +396,8 @@ export function TrialCompanion({
       }, 2200);
     }
 
-    const now = performance.now();
-    const { burst, result } = registerClickBurst(burstRef.current, now);
-    burstRef.current = burst;
-
-    if (result.kind === "multi") {
-      clearTimer(singleClickTimerRef);
-      applyEgg();
-      armIdleTimer();
-      return;
-    }
-
-    clearTimer(singleClickTimerRef);
-    singleClickTimerRef.current = window.setTimeout(() => {
-      singleClickTimerRef.current = null;
-      burstRef.current = { count: 0, lastAt: 0 };
-      applyTap();
-      armIdleTimer();
-    }, TRIAL_MULTI_CLICK_WINDOW_MS);
+    applyTap();
+    armIdleTimer();
   }
 
   function handlePointerCancel(event: JSX.TargetedPointerEvent<HTMLDivElement>) {
@@ -435,7 +428,7 @@ export function TrialCompanion({
         height: `${size.height}px`,
       }}
       role="img"
-      aria-label={`${pet.petName} 试用中，可拖动；点击互动`}
+      aria-label={`${pet.petName} 试用中，可拖动；点击互动；底部按钮切换特殊动作`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -448,7 +441,7 @@ export function TrialCompanion({
     >
       {bubble ? (
         <div
-          className="trial-companion__bubble pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 z-10 w-max max-w-[min(240px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/88 px-3.5 py-2.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.35)] backdrop-blur-md"
+          className="trial-companion__bubble pointer-events-none absolute bottom-[calc(100%+48px)] left-1/2 z-10 w-max max-w-[min(240px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/88 px-3.5 py-2.5 text-left shadow-[0_12px_28px_rgba(15,23,42,0.35)] backdrop-blur-md"
           role="status"
           aria-live="polite"
         >
@@ -470,17 +463,14 @@ export function TrialCompanion({
         ) : null}
       </div>
 
+      {/* Fully outside the sprite box so chrome never covers the pet. */}
       <div
         data-trial-chrome
-        className={`trial-companion__chrome absolute -right-1 -top-3 flex items-center gap-1 transition ${
-          chromeSticky || chromePulse
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-        }`}
+        className={`trial-companion__chrome absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-1 transition ${chromeRevealClass}`}
       >
         <button
           type="button"
-          className="grid h-7 w-7 place-items-center rounded-full border border-line bg-white/95 text-sm font-bold text-ink-soft shadow-sm transition hover:border-brand/40 hover:text-brand disabled:opacity-40"
+          className={CHROME_BTN_CLASS}
           aria-label="缩小试用宠物"
           disabled={scaleStep <= 0}
           onClick={(event) => {
@@ -493,7 +483,7 @@ export function TrialCompanion({
         </button>
         <button
           type="button"
-          className="grid h-7 w-7 place-items-center rounded-full border border-line bg-white/95 text-sm font-bold text-ink-soft shadow-sm transition hover:border-brand/40 hover:text-brand disabled:opacity-40"
+          className={CHROME_BTN_CLASS}
           aria-label="放大试用宠物"
           disabled={scaleStep >= 2}
           onClick={(event) => {
@@ -506,7 +496,7 @@ export function TrialCompanion({
         </button>
         <button
           type="button"
-          className="grid h-7 w-7 place-items-center rounded-full border border-line bg-white/95 text-sm font-bold text-ink-soft shadow-sm transition hover:border-coral/40 hover:text-coral"
+          className={`${CHROME_BTN_CLASS} hover:border-coral/40 hover:text-coral`}
           aria-label="送回图鉴"
           onClick={(event) => {
             event.stopPropagation();
@@ -517,6 +507,31 @@ export function TrialCompanion({
           ×
         </button>
       </div>
+
+      {hasSpecialActions ? (
+        <div
+          data-trial-chrome
+          className={`trial-companion__actions absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 items-center gap-1 transition ${chromeRevealClass}`}
+        >
+          {specialActions.map((action) => (
+            <button
+              key={action.logical}
+              type="button"
+              className={CHROME_BTN_CLASS}
+              aria-label={action.label}
+              title={action.label}
+              disabled={!action.available}
+              onClick={(event) => {
+                event.stopPropagation();
+                applySpecial(action.logical);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <span aria-hidden="true">{action.icon}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

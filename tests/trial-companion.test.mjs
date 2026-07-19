@@ -69,7 +69,7 @@ test("clamp and default trial position stay inside the viewport", () => {
 
   const clamped = clampTrialPosition({ x: 9999, y: -40 }, size, viewport);
   assert.equal(clamped.x, viewport.width - size.width - 16);
-  assert.equal(clamped.y, 16);
+  assert.equal(clamped.y, 40);
 });
 
 test("scale steps clamp to 0..2", () => {
