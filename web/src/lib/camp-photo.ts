@@ -33,14 +33,15 @@ export const CAMP_ASPECT_OPTIONS: Array<{
   hint: string;
 }> = [
   { id: "portrait", label: "长图", hint: "适合发朋友圈" },
-  { id: "landscape", label: "横版 16:9", hint: "更宽的横图" },
+  { id: "landscape", label: "横版 16:9", hint: "高清横图 2560×1440" },
 ];
 
 /** Design-time canvas sizes (export pixels). */
 export const CAMP_STAGE: Record<CampAspect, { width: number; height: number; rows: number }> = {
   // Soft ceiling; actual row count is chosen to maximize pet size while filling the stage.
+  // Landscape uses 2560×1440 (~3.7MP) so per-pet pixels stay close to portrait 1600×2400 (~3.8MP).
   portrait: { width: 1600, height: 2400, rows: 14 },
-  landscape: { width: 1600, height: 900, rows: 9 },
+  landscape: { width: 2560, height: 1440, rows: 9 },
 };
 
 export const CAMP_ANIM_THRESHOLD = 40;
@@ -120,8 +121,9 @@ function estimateCampPetSize(
   bandH: number,
   aspect: CampAspect,
 ) {
-  const maxSize = aspect === "portrait" ? 260 : 210;
-  const minSize = aspect === "portrait" ? 44 : 38;
+  // Landscape canvas is wider/taller in pixels; allow larger absolute pet slots.
+  const maxSize = aspect === "portrait" ? 260 : 340;
+  const minSize = aspect === "portrait" ? 44 : 52;
   // Small horizontal breathing room between neighbors.
   const byWidth = usableW / Math.max(1, fullestRow + 0.08);
   // Each row owns an equal vertical slice; cell must fit body + nameplate.
