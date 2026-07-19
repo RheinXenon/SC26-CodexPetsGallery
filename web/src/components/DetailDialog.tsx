@@ -80,7 +80,11 @@ export function DetailDialog({
     }
 
     const canvas = document.createElement("canvas");
-    canvas.className = "pixelated relative z-[1] mx-auto max-h-[min(48vh,400px)] w-auto max-w-full drop-shadow-[0_18px_30px_rgba(15,23,42,0.14)]";
+    // Seed intrinsic size before the sheet arrives so we never flash the UA
+    // default 300×150 box and then jump to the real frame aspect.
+    canvas.width = Number(pet.previewFrameWidth) || 192;
+    canvas.height = Number(pet.previewFrameHeight) || 208;
+    canvas.className = "pixelated relative z-[1] mx-auto max-h-[min(48vh,400px)] w-auto max-w-full opacity-0 transition-opacity duration-200 drop-shadow-[0_18px_30px_rgba(15,23,42,0.14)]";
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", `${pet.petName} 的${defaultState.label}状态动画`);
     const loading = document.createElement("span");
@@ -93,7 +97,10 @@ export function DetailDialog({
       url: imageUrl,
       grid: pet.spriteGrid,
       state: defaultState,
-      onReady: () => loading.remove(),
+      onReady: () => {
+        loading.remove();
+        canvas.classList.add("opacity-100");
+      },
       onError: () => {
         setLoadError(true);
         target.replaceChildren();

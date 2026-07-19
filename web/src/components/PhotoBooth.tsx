@@ -111,7 +111,7 @@ function StageActor({
 
     canvas = document.createElement("canvas");
     canvas.className = [
-      "pixelated photo-actor-sprite absolute inset-0 m-auto h-full w-auto max-w-full",
+      "pixelated photo-actor-sprite col-start-1 row-start-1 h-full w-auto max-h-full max-w-full",
       "opacity-0 transition-opacity duration-300",
       "drop-shadow-[0_14px_18px_rgba(15,23,42,0.28)]",
     ].join(" ");
@@ -161,19 +161,21 @@ function StageActor({
       }}
     >
       <div className="photo-actor-bob relative w-full">
-        <div ref={hostRef} className="relative mx-auto aspect-square w-full">
+        <div ref={hostRef} className="mx-auto grid aspect-square w-full place-items-center">
           {posterUrl && !broken ? (
             <img
               src={posterUrl}
               alt={pet.petName}
-              className={`pixelated photo-actor-sprite absolute inset-0 m-auto h-full w-auto max-w-full object-contain drop-shadow-[0_14px_18px_rgba(15,23,42,0.28)] transition-opacity duration-300 ${
+              width={Number(pet.previewFrameWidth) || 192}
+              height={Number(pet.previewFrameHeight) || 208}
+              className={`pixelated photo-actor-sprite col-start-1 row-start-1 h-full w-auto max-h-full max-w-full object-contain drop-shadow-[0_14px_18px_rgba(15,23,42,0.28)] transition-opacity duration-300 ${
                 animated ? "opacity-0" : "opacity-100"
               }`}
               draggable={false}
               onError={() => setBroken(true)}
             />
           ) : !animated ? (
-            <div className="grid h-full place-items-center rounded-xl bg-white/50 text-xs text-muted">
+            <div className="col-start-1 row-start-1 grid h-full place-items-center rounded-xl bg-white/50 text-xs text-muted">
               无图
             </div>
           ) : null}

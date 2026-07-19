@@ -75,10 +75,11 @@ export function CardPreview({
     const activate = () => {
       if (reduceMotion || animator || !previewUrl || !state) return;
       canvas = document.createElement("canvas");
-      // Canvas size is corrected from the sheet on load; CSS scales the frame.
+      // Stacked in the host grid cell; intrinsic size is known up front so layout
+      // does not jump from the default 300×150 canvas or from inset-0 + m-auto.
       canvas.className = [
-        "sprite-canvas pixelated absolute inset-0 m-auto",
-        "h-full w-auto max-w-full opacity-0 transition-opacity duration-300",
+        "sprite-canvas pixelated col-start-1 row-start-1",
+        "h-full w-auto max-h-full max-w-full opacity-0 transition-opacity duration-300",
         "drop-shadow-[0_14px_22px_rgba(15,23,42,0.14)]",
       ].join(" ");
       canvas.width = Number(pet.previewFrameWidth) || 192;
@@ -148,24 +149,24 @@ export function CardPreview({
       />
       <span className="pointer-events-none absolute inset-x-[18%] bottom-[10%] h-8 rounded-[100%] bg-slate-500/10 blur-md" />
 
-      {/* Media box: sprite is forced to fill most of the stage and may upscale */}
+      {/* Media box: grid cell stacks poster + canvas and keeps both centered */}
       <span className={`relative flex h-full w-full items-center justify-center ${STAGE_PAD[density]}`}>
-        <span ref={hostRef} className={`relative ${spriteBox}`}>
+        <span ref={hostRef} className={`grid ${spriteBox} place-items-center`}>
           {posterUrl && !broken ? (
             <img
               src={posterUrl}
               alt={`${pet.petName} 的预览`}
-              width={192}
-              height={208}
+              width={Number(pet.previewFrameWidth) || 192}
+              height={Number(pet.previewFrameHeight) || 208}
               loading={eager ? "eager" : "lazy"}
               decoding="async"
-              className={`pixelated h-full w-auto max-w-full object-contain drop-shadow-[0_14px_22px_rgba(15,23,42,0.14)] transition duration-300 group-hover:-translate-y-1 ${
+              className={`pixelated col-start-1 row-start-1 h-full w-auto max-h-full max-w-full object-contain drop-shadow-[0_14px_22px_rgba(15,23,42,0.14)] transition duration-300 group-hover:-translate-y-1 ${
                 animated ? "opacity-0" : "opacity-100"
               }`}
               onError={() => setBroken(true)}
             />
           ) : (
-            <span className="grid h-full place-items-center px-3 text-center text-sm text-muted">
+            <span className="col-start-1 row-start-1 grid h-full place-items-center px-3 text-center text-sm text-muted">
               预览暂时无法显示
             </span>
           )}
