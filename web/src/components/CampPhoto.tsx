@@ -813,10 +813,10 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-col gap-3 overflow-auto p-4 sm:p-5">
+          <section className="flex min-h-0 flex-col gap-3 overflow-hidden p-4 sm:p-5">
             <div
               ref={viewportRef}
-              className="camp-stage-viewport relative overflow-hidden rounded-[1.5rem] border border-line/80 bg-slate-950/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_18px_40px_rgba(15,23,42,0.08)]"
+              className="camp-stage-viewport relative min-h-0 flex-1 overflow-hidden rounded-[1.5rem] border border-line/80 bg-slate-950/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_18px_40px_rgba(15,23,42,0.08)]"
               style={{ touchAction: "none" }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
@@ -825,7 +825,7 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
             >
               <div
                 ref={frameRef}
-                className="camp-stage-frame flex h-[min(72dvh,860px)] min-h-[320px] w-full items-center justify-center overflow-hidden p-2 sm:p-3"
+                className="camp-stage-frame flex h-full min-h-[240px] w-full items-center justify-center overflow-hidden p-2 sm:p-3"
               >
                 <div
                   ref={stageRef}
@@ -960,64 +960,66 @@ export function CampPhoto({ open, allPets, onClose }: Props) {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas/70 p-1">
+            <div className="flex shrink-0 flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas/70 p-1">
+                  <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-ink-soft transition hover:bg-white hover:text-brand"
+                    aria-label="缩小"
+                    onClick={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}
+                  >
+                    −
+                  </button>
+                  <span className="min-w-[3.5rem] text-center text-xs font-semibold tabular-nums text-muted">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-ink-soft transition hover:bg-white hover:text-brand"
+                    aria-label="放大"
+                    onClick={() => setZoom((value) => Math.min(4, Number((value + 0.25).toFixed(2))))}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition hover:bg-white hover:text-brand"
+                    onClick={resetView}
+                  >
+                    回正
+                  </button>
+                </div>
+                <p className="text-xs text-muted">可以放大、拖动查看；点宠物能看是谁</p>
+              </div>
+
+              {message ? (
+                <p className="text-sm text-ink-soft" role="status">{message}</p>
+              ) : (
+                <p className="text-sm text-muted">
+                  {campPets.length === 0
+                    ? "等有宠物入场后，就可以保存图片了。"
+                    : "调好看一点，再保存图片发朋友圈吧。"}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
-                  className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-ink-soft transition hover:bg-white hover:text-brand"
-                  aria-label="缩小"
-                  onClick={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}
+                  className="rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(59,130,246,0.25)] transition hover:bg-brand-dark active:scale-[0.98] disabled:opacity-50"
+                  disabled={!canExport}
+                  onClick={exportPng}
                 >
-                  −
+                  {busy ? "保存中…" : "导出 PNG"}
                 </button>
-                <span className="min-w-[3.5rem] text-center text-xs font-semibold tabular-nums text-muted">
-                  {Math.round(zoom * 100)}%
-                </span>
                 <button
                   type="button"
-                  className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-ink-soft transition hover:bg-white hover:text-brand"
-                  aria-label="放大"
-                  onClick={() => setZoom((value) => Math.min(4, Number((value + 0.25).toFixed(2))))}
+                  className="rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink-soft transition hover:border-brand/30 active:scale-[0.98]"
+                  onClick={onClose}
                 >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition hover:bg-white hover:text-brand"
-                  onClick={resetView}
-                >
-                  回正
+                  关闭
                 </button>
               </div>
-              <p className="text-xs text-muted">可以放大、拖动查看；点宠物能看是谁</p>
-            </div>
-
-            {message ? (
-              <p className="text-sm text-ink-soft" role="status">{message}</p>
-            ) : (
-              <p className="text-sm text-muted">
-                {campPets.length === 0
-                  ? "等有宠物入场后，就可以保存图片了。"
-                  : "调好看一点，再保存图片发朋友圈吧。"}
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                className="rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(59,130,246,0.25)] transition hover:bg-brand-dark active:scale-[0.98] disabled:opacity-50"
-                disabled={!canExport}
-                onClick={exportPng}
-              >
-                {busy ? "保存中…" : "导出 PNG"}
-              </button>
-              <button
-                type="button"
-                className="rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink-soft transition hover:border-brand/30 active:scale-[0.98]"
-                onClick={onClose}
-              >
-                关闭
-              </button>
             </div>
           </section>
         </div>
