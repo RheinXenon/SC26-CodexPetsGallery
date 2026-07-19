@@ -92,7 +92,6 @@ function CampActor({
   const [broken, setBroken] = useState(!pet.posterUrl);
   const motion = useMemo(() => createActorMotion(pet.id, index * 0.17), [pet.id, index]);
   const nameLabel = resolvePhotoNameLabel(pet, nameMode);
-  const showPlate = Boolean(nameLabel) && slot.rsize * 100 > 3.4;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -157,6 +156,9 @@ function CampActor({
   const leftPct = slot.rx * 100;
   const bottomPct = (1 - slot.ry) * 100;
   const widthPct = slot.rsize * 100;
+  // Live nameplate tracks pet size (rsize is size/stageWidth). Hide when microscopic.
+  const plateFontPx = Math.max(6, Math.min(13, widthPct * 0.24));
+  const showPlate = Boolean(nameLabel) && widthPct >= 2.4;
 
   return (
     <button
@@ -203,13 +205,25 @@ function CampActor({
             </div>
           ) : null}
         </div>
-        <div className="photo-actor-shadow mx-auto mt-0.5 h-1.5 w-[65%] rounded-[100%] bg-slate-900/20 blur-[2px]" />
+        <div
+          className="photo-actor-shadow mx-auto rounded-[100%] bg-slate-900/20 blur-[2px]"
+          style={{
+            marginTop: `${Math.max(1, widthPct * 0.04)}px`,
+            height: `${Math.max(2, Math.min(6, widthPct * 0.08))}px`,
+            width: "65%",
+          }}
+        />
       </div>
       {showPlate ? (
         <span
-          className={`photo-name-tag mt-0.5 max-w-[120%] truncate rounded-full px-1.5 py-0.5 text-[9px] font-semibold sm:text-[10px] ${
+          className={`photo-name-tag max-w-[135%] truncate rounded-full font-semibold leading-none ${
             dark ? "bg-slate-950/55 text-white" : "bg-white/90 text-ink shadow-sm"
           }`}
+          style={{
+            marginTop: `${Math.max(1, plateFontPx * 0.2)}px`,
+            fontSize: `${plateFontPx}px`,
+            padding: `${Math.max(1, plateFontPx * 0.22)}px ${Math.max(3, plateFontPx * 0.55)}px`,
+          }}
         >
           {nameLabel}
         </span>

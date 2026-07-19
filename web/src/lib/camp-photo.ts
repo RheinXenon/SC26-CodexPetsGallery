@@ -38,11 +38,18 @@ export const CAMP_ASPECT_OPTIONS: Array<{
 
 /** Design-time canvas sizes (export pixels). */
 export const CAMP_STAGE: Record<CampAspect, { width: number; height: number; rows: number }> = {
-  portrait: { width: 1600, height: 2400, rows: 6 },
-  landscape: { width: 1600, height: 900, rows: 4 },
+  // Soft ceiling; actual row count is chosen to maximize pet size while filling the stage.
+  portrait: { width: 1600, height: 2400, rows: 14 },
+  landscape: { width: 1600, height: 900, rows: 9 },
 };
 
 export const CAMP_ANIM_THRESHOLD = 40;
+
+/**
+ * How tall one pet cell is relative to its slot size.
+ * Includes sprite body + a little room for the nameplate under the feet.
+ */
+const CAMP_CELL_RATIO = 1.22;
 
 export const CEREMONY_BACKGROUND_ID = "ceremony";
 
@@ -87,10 +94,49 @@ export function groupKeyOf(pet: Pet): string {
   return normalizeGroupNumber(pet.group) ?? "none";
 }
 
+function buildRowLengths(count: number, rows: number): number[] {
+  // Prefer a nearly-rectangular grid; remainder pets go on the front rows.
+  const base = Math.floor(count / rows);
+  let extra = count % rows;
+  const rowLengths: number[] = [];
+  for (let r = 0; r < rows; r += 1) {
+    // Front rows (higher index) receive the extras first → fuller front.
+    const fromFront = rows - 1 - r;
+    const add = fromFront < extra ? 1 : 0;
+    rowLengths.push(base + add);
+  }
+  // Guard: if base was 0, some back rows may be empty — fold into fewer rows at call site.
+  return rowLengths;
+}
+
+/**
+ * Pet size for a candidate grid: limited by cell width and cell height.
+ * Rows are non-overlapping and evenly tiled across the stage band.
+ */
+function estimateCampPetSize(
+  fullestRow: number,
+  rows: number,
+  usableW: number,
+  bandH: number,
+  aspect: CampAspect,
+) {
+  const maxSize = aspect === "portrait" ? 260 : 210;
+  const minSize = aspect === "portrait" ? 44 : 38;
+  // Small horizontal breathing room between neighbors.
+  const byWidth = usableW / Math.max(1, fullestRow + 0.08);
+  // Each row owns an equal vertical slice; cell must fit body + nameplate.
+  const byHeight = bandH / Math.max(1, rows * CAMP_CELL_RATIO);
+  return Math.max(minSize, Math.min(maxSize, byWidth, byHeight));
+}
+
 /**
  * Multi-row graduation layout with soft group clustering.
  * Pets are already expected in group order (use getCampPets).
- * Fixed row count per aspect; size shrinks as N grows.
+ *
+ * Goals:
+ * - Maximize pet size (search row count)
+ * - Fill the usable stage evenly (no bottom clustering, no huge empty bands)
+ * - No row stagger / no intentional overlap
  */
 export function layoutCampSlots(
   pets: Pet[],
@@ -102,62 +148,70 @@ export function layoutCampSlots(
   if (count <= 0) return [];
 
   const preset = CAMP_STAGE[aspect];
-  const maxRows = preset.rows;
-
-  // Prefer fewer rows when the cast is small, but stay in "graduation" mode (≥2 when N≥3).
-  let rows = Math.min(maxRows, Math.max(1, Math.ceil(Math.sqrt(count * (aspect === "portrait" ? 0.85 : 0.55)))));
-  if (count >= 3) rows = Math.max(2, rows);
-  rows = Math.min(rows, count);
-
-  // Capacity per row (last row may be shorter).
-  const basePerRow = Math.ceil(count / rows);
-
-  // Vertical band for the formation (leave room for slogan / stage lips).
-  const topPad = height * (aspect === "portrait" ? 0.16 : 0.18);
-  const bottomPad = height * (aspect === "portrait" ? 0.1 : 0.12);
+  // Leave room for slogan (top) and watermark (bottom), but keep the cast band large.
+  const topPad = height * (aspect === "portrait" ? 0.1 : 0.12);
+  const bottomPad = height * (aspect === "portrait" ? 0.06 : 0.08);
   const bandH = Math.max(120, height - topPad - bottomPad);
-
-  // First pass size estimate from the fullest row.
-  const sidePad = width * 0.06;
+  const sidePad = width * (aspect === "portrait" ? 0.03 : 0.028);
   const usableW = width - sidePad * 2;
-  let size = Math.min(
-    aspect === "portrait" ? 210 : 170,
-    usableW / (basePerRow + 0.35),
-    bandH / (rows * 0.72 + 0.35),
-  );
-  size = Math.max(aspect === "portrait" ? 42 : 36, size);
 
-  // Build row lengths: fill front-to-back so front row is fullest (graduation feel).
-  // We still place pets in group order left→right, top→bottom (back row first visually).
-  const rowLengths: number[] = [];
-  let remaining = count;
-  for (let r = 0; r < rows; r += 1) {
-    const leftRows = rows - r;
-    const take = r === rows - 1 ? remaining : Math.min(basePerRow, Math.ceil(remaining / leftRows));
-    rowLengths.push(take);
-    remaining -= take;
+  const minRows = count >= 3 ? 2 : 1;
+  const maxRows = Math.min(preset.rows, count);
+
+  let bestRows = minRows;
+  let bestSize = 0;
+  let bestLengths = buildRowLengths(count, minRows);
+
+  for (let rows = minRows; rows <= maxRows; rows += 1) {
+    const rowLengths = buildRowLengths(count, rows);
+    if (rowLengths.some((n) => n <= 0)) continue;
+    const fullest = Math.max(...rowLengths);
+    // Skip pathological single-file columns when we still have row budget.
+    if (fullest < 2 && count >= 6 && rows < maxRows) continue;
+
+    const size = estimateCampPetSize(fullest, rows, usableW, bandH, aspect);
+    // Prefer larger pets; slight bias toward more rows when sizes are within 1px
+    // so the grid stays closer to square and fills the stage more evenly.
+    const betterSize = size > bestSize + 0.5;
+    const similarButFuller =
+      Math.abs(size - bestSize) <= 0.5
+      && Math.abs(fullest - rows) < Math.abs(Math.max(...bestLengths) - bestRows);
+    if (betterSize || similarButFuller) {
+      bestSize = size;
+      bestRows = rows;
+      bestLengths = rowLengths;
+    }
   }
 
-  // Back row is index 0 (smaller / higher); front row is last.
+  const rows = bestRows;
+  const size = bestSize;
+  const cellH = bandH / rows;
+
+  // Back row is index 0; front row is last. Feet sit near the bottom of each equal cell.
   const slots: CampPhotoSlot[] = [];
   let petIndex = 0;
 
   for (let row = 0; row < rows; row += 1) {
-    const n = rowLengths[row];
-    // Mild perspective: back rows slightly smaller.
-    const depth = rows === 1 ? 1 : 0.86 + (row / (rows - 1)) * 0.14;
+    const n = bestLengths[row];
+    // Very mild perspective only — back row a touch smaller, still aligned.
+    const depth = rows === 1 ? 1 : 0.94 + (row / Math.max(1, rows - 1)) * 0.06;
     const rowSize = size * depth;
-    const rowY = topPad + (bandH * (row + 0.72)) / rows;
 
-    // Stagger odd rows a touch for a packed class-photo look.
-    const stagger = row % 2 === 1 ? rowSize * 0.12 : 0;
-    const totalW = n * rowSize;
-    const startX = (width - totalW) / 2 + rowSize / 2 + stagger;
+    // Even vertical tiles: each row gets the same band slice.
+    // Feet baseline sits in the lower portion of the cell so the body fills upward.
+    const cellTop = topPad + row * cellH;
+    const rowY = cellTop + cellH * 0.82;
+
+    // Center the row horizontally; no stagger.
+    const gap = rowSize * 0.02;
+    const step = rowSize + gap;
+    const totalW = n * rowSize + Math.max(0, n - 1) * gap;
+    const startX = (width - totalW) / 2 + rowSize / 2;
 
     for (let col = 0; col < n; col += 1) {
       const pet = pets[petIndex];
       if (!pet) break;
-      const x = startX + col * rowSize;
+      const x = startX + col * step;
       const y = rowY;
       slots.push({
         x,
@@ -285,12 +339,13 @@ function paintNameplate(
   dark: boolean,
 ) {
   // Hide plates that would be illegible when the cast is dense.
-  if (slot.size < 56) return;
+  if (slot.size < 36) return;
 
-  const fontSize = Math.max(11, Math.min(18, Math.floor(slot.size * 0.11)));
+  // Scale type with pet size; keep a readable floor without blowing past the body.
+  const fontSize = Math.max(8, Math.min(20, Math.round(slot.size * 0.145)));
   ctx.font = `600 ${fontSize}px "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif`;
   const textWidth = ctx.measureText(label).width;
-  const maxW = slot.size * 1.15;
+  const maxW = slot.size * (slot.size < 64 ? 1.35 : 1.2);
   let drawLabel = label;
   if (textWidth > maxW) {
     // Truncate with ellipsis
@@ -301,11 +356,11 @@ function paintNameplate(
   }
 
   const finalW = ctx.measureText(drawLabel).width;
-  const padX = Math.max(8, fontSize * 0.55);
+  const padX = Math.max(5, fontSize * 0.5);
   const boxW = finalW + padX * 2;
-  const boxH = Math.max(18, fontSize + 10);
+  const boxH = Math.max(12, fontSize + Math.round(fontSize * 0.55));
   const boxX = slot.x - boxW / 2;
-  const boxY = slot.y + 4;
+  const boxY = slot.y + Math.max(2, Math.round(slot.size * 0.02));
 
   ctx.fillStyle = dark ? "rgba(15,23,42,0.62)" : "rgba(255,255,255,0.92)";
   ctx.beginPath();
