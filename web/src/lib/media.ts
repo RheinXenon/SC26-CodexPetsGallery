@@ -99,6 +99,8 @@ type AnimatorOptions = {
   speed?: number;
   /** Shift the first tick backward so pets desync without waiting. */
   phaseOffsetMs?: number;
+  /** Keep animating even when prefers-reduced-motion is on (trial companion). */
+  forceAnimate?: boolean;
 };
 
 export class SpriteAnimator {
@@ -116,6 +118,7 @@ export class SpriteAnimator {
   image: HTMLImageElement | null = null;
   speed = 1;
   phaseOffsetMs = 0;
+  forceAnimate = false;
   ready = false;
 
   constructor({
@@ -129,6 +132,7 @@ export class SpriteAnimator {
     startFrame = 0,
     speed = 1,
     phaseOffsetMs = 0,
+    forceAnimate = false,
   }: AnimatorOptions) {
     this.canvas = canvas;
     this.url = url;
@@ -139,6 +143,7 @@ export class SpriteAnimator {
     this.imageLoader = imageLoader;
     this.speed = Math.max(0.25, speed || 1);
     this.phaseOffsetMs = Math.max(0, phaseOffsetMs || 0);
+    this.forceAnimate = Boolean(forceAnimate);
     const frames = Math.max(1, state.frames || 1);
     this.frameIndex = ((Math.floor(startFrame) % frames) + frames) % frames;
     this.tick = this.tick.bind(this);
@@ -157,7 +162,7 @@ export class SpriteAnimator {
       this.ready = true;
       this.draw();
       this.onReady?.();
-      if (!reduceMotion) this.animationFrame = requestAnimationFrame(this.tick);
+      if (!reduceMotion || this.forceAnimate) this.animationFrame = requestAnimationFrame(this.tick);
     } catch (error) {
       if (!this.destroyed) this.onError?.(error);
     }

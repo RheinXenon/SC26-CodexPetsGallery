@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { CampPhoto } from "../components/CampPhoto";
 import { GalleryTools, Pagination, SiteHeader } from "../components/Chrome";
 import { DetailDialog } from "../components/DetailDialog";
 import { HeroShowcase } from "../components/HeroShowcase";
 import { PetCard } from "../components/PetCard";
 import { PhotoBooth } from "../components/PhotoBooth";
+import { TrialCompanion } from "../components/TrialCompanion";
 import { DEFAULT_CONFIG, loadConfig, loadExamples, loadSubmissions } from "../lib/data";
 import { loadDensity, saveDensity } from "../lib/density";
 import { matchesGroup, matchesSearch } from "../lib/gallery-filter";
 import { reduceMotion } from "../lib/media";
 import { PHOTO_MAX } from "../lib/photo-booth";
+import {
+  supportsHoverFinePointer,
+  type TrialPoint,
+  type TrialScaleStep,
+} from "../lib/trial-companion";
 import { readUrlState, writeUrlState } from "../lib/url-state";
 import type { DensityMode, GalleryConfig, Pet } from "../lib/types";
 
@@ -33,6 +39,10 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [campPhotoOpen, setCampPhotoOpen] = useState(false);
+  const [trialPetId, setTrialPetId] = useState<string | null>(null);
+  const [trialPosition, setTrialPosition] = useState<TrialPoint | null>(null);
+  const [trialScaleStep, setTrialScaleStep] = useState<TrialScaleStep>(1);
+  const [hoverFinePointer, setHoverFinePointer] = useState(false);
   const toolsAnchorRef = useRef<HTMLDivElement>(null);
   const cardFocusRef = useRef<string | null>(null);
 
@@ -80,6 +90,14 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    setHoverFinePointer(supportsHoverFinePointer());
+    const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const onChange = () => setHoverFinePointer(media.matches);
+    media.addEventListener?.("change", onChange);
+    return () => media.removeEventListener?.("change", onChange);
+  }, []);
+
   const filteredPets = useMemo(
     () => allPets.filter((pet) => matchesSearch(pet, query) && matchesGroup(pet, group)),
     [allPets, query, group],
@@ -89,6 +107,8 @@ export function App() {
   const safePage = Math.min(Math.max(1, page), pageCount);
   const pagePets = filteredPets.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const activePet = activePetId ? allPets.find((pet) => pet.id === activePetId) ?? null : null;
+  const trialPet = trialPetId ? allPets.find((pet) => pet.id === trialPetId) ?? null : null;
+  const overlayOpen = Boolean(activePet || photoOpen || campPhotoOpen);
 
   useEffect(() => {
     if (page !== safePage) setPage(safePage);
@@ -110,6 +130,14 @@ export function App() {
       setActivePetId(null);
     }
   }, [activePetId, allPets]);
+
+  useEffect(() => {
+    if (!trialPetId) return;
+    if (allPets.length === 0) return;
+    if (!allPets.some((pet) => pet.id === trialPetId)) {
+      setTrialPetId(null);
+    }
+  }, [trialPetId, allPets]);
 
   const resultSummary = filteredPets.length === 0
     ? "0 个结果"
@@ -148,6 +176,23 @@ export function App() {
     setDensity(mode);
     saveDensity(mode);
   }
+
+  const startTrial = useCallback((pet: Pet) => {
+    setTrialPetId(pet.id);
+    setActivePetId(null);
+  }, []);
+
+  const dismissTrial = useCallback(() => {
+    setTrialPetId(null);
+  }, []);
+
+  const handleTrialPosition = useCallback((next: TrialPoint) => {
+    setTrialPosition(next);
+  }, []);
+
+  const handleTrialScale = useCallback((step: TrialScaleStep) => {
+    setTrialScaleStep(step);
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -237,8 +282,12 @@ export function App() {
                 density={density}
                 selectMode={selectMode}
                 selected={selectedIds.includes(pet.id)}
+                trialPetId={trialPetId}
+                showTrialShortcut={hoverFinePointer}
                 onOpen={openPet}
                 onToggleSelect={toggleSelect}
+                onStartTrial={startTrial}
+                onDismissTrial={dismissTrial}
               />
             ))}
           </div>
@@ -265,7 +314,13 @@ export function App() {
         </div>
       </footer>
 
-      <DetailDialog pet={activePet} onClose={closePet} />
+      <DetailDialog
+        pet={activePet}
+        trialPetId={trialPetId}
+        onClose={closePet}
+        onStartTrial={startTrial}
+        onDismissTrial={dismissTrial}
+      />
       <PhotoBooth
         open={photoOpen}
         allPets={allPets}
@@ -279,6 +334,18 @@ export function App() {
         allPets={allPets}
         onClose={() => setCampPhotoOpen(false)}
       />
+
+      {trialPet ? (
+        <TrialCompanion
+          pet={trialPet}
+          position={trialPosition}
+          scaleStep={trialScaleStep}
+          hidden={overlayOpen}
+          onPositionChange={handleTrialPosition}
+          onScaleStepChange={handleTrialScale}
+          onDismiss={dismissTrial}
+        />
+      ) : null}
     </div>
   );
 }

@@ -213,6 +213,39 @@
     animation: fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
+  /* Codex-like speech bubble with a bottom tail pointing at the pet. */
+  .trial-companion__bubble {
+    --trial-bubble-bg: rgba(2, 6, 23, 0.88);
+    --trial-bubble-border: rgba(255, 255, 255, 0.1);
+  }
+
+  .trial-companion__bubble::after,
+  .trial-companion__bubble::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /* Outer border triangle */
+  .trial-companion__bubble::before {
+    bottom: -8px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid var(--trial-bubble-border);
+  }
+
+  /* Inner fill triangle, slightly higher so only a thin border rim remains */
+  .trial-companion__bubble::after {
+    bottom: -7px;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid var(--trial-bubble-bg);
+  }
+
   @keyframes fade-up {
     from {
       opacity: 0;

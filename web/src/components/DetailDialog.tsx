@@ -12,7 +12,10 @@ import type { Pet, SpriteState } from "../lib/types";
 
 type Props = {
   pet: Pet | null;
+  trialPetId?: string | null;
   onClose: () => void;
+  onStartTrial?: (pet: Pet) => void;
+  onDismissTrial?: () => void;
 };
 
 function DetailLink({ label, href }: { label: string; href?: string | null }) {
@@ -31,7 +34,13 @@ function DetailLink({ label, href }: { label: string; href?: string | null }) {
   );
 }
 
-export function DetailDialog({ pet, onClose }: Props) {
+export function DetailDialog({
+  pet,
+  trialPetId = null,
+  onClose,
+  onStartTrial,
+  onDismissTrial,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const animatorRef = useRef<SpriteAnimator | null>(null);
@@ -238,9 +247,35 @@ export function DetailDialog({ pet, onClose }: Props) {
               </header>
 
               <div className="flex flex-wrap gap-2">
+                {(() => {
+                  const isCurrentTrial = Boolean(pet && trialPetId === pet.id);
+                  const hasOtherTrial = Boolean(pet && trialPetId && trialPetId !== pet.id);
+                  const trialLabel = isCurrentTrial
+                    ? "送回图鉴"
+                    : hasOtherTrial
+                      ? "换成它"
+                      : "放到页面上玩玩";
+                  return (
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold shadow-[0_10px_22px_rgba(59,130,246,0.25)] transition ${
+                        isCurrentTrial
+                          ? "border border-brand/20 bg-white text-brand-dark hover:border-brand/40"
+                          : "bg-brand text-white hover:bg-brand-dark"
+                      }`}
+                      onClick={() => {
+                        if (!pet) return;
+                        if (isCurrentTrial) onDismissTrial?.();
+                        else onStartTrial?.(pet);
+                      }}
+                    >
+                      {trialLabel}
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(59,130,246,0.25)] transition hover:bg-brand-dark"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink-soft transition hover:border-brand/30 hover:text-brand"
                   onClick={copyLink}
                 >
                   {copied ? "已复制链接" : "复制分享链接"}
