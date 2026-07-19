@@ -210,3 +210,8 @@ export class SpriteAnimator {
 export function getDefaultState(grid: SpriteGrid) {
   return grid.states.find((state) => state.id === grid.defaultState) ?? grid.states[0];
 }
+
+/** Prefer the build-time detail sheet; fall back to the author original. */
+export function getDetailPlaybackUrl(pet: { detailUrl?: string | null; spriteUrl?: string | null }) {
+  return safeExternalUrl(pet.detailUrl) ?? safeExternalUrl(pet.spriteUrl);
+}

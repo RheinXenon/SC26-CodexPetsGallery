@@ -1,100 +1,128 @@
 # SC26 宠物画廊
 
-这是 SummerCamp 2026 学员宠物画廊的个人仓库原型。学员通过 GitHub Issue Form 投稿，GitHub Actions 汇总有效投稿并部署静态页面；页面始终展示三个示例宠物，示例不计入投稿数量。
+SummerCamp 2026 的学员宠物图鉴：把大家做的像素宠物收在一起看、搜、分享，还能多宠合影。
 
-前端使用 **Vite + Preact + TypeScript + Tailwind** 构建为静态站点，视觉为产品级图鉴风格。列表仍采用构建期生成的封面/低分辨率预览，详情才加载完整精灵图。支持搜索、分组筛选、分页、卡片密度切换、分享深链（`?pet=`）与多宠合影导出。
+页面始终带三个官方示例，示例不占投稿名额。
 
-## 本地预览
+---
 
-需要 Node.js 20 或更高版本。
+## 写给学员
+
+### 你能在这里做什么
+
+- 浏览所有公开宠物，点开看动画和状态
+- 按名字 / 昵称 / 分组搜索、筛选
+- 复制某个宠物的分享链接发给朋友
+- 多选几只宠物（或按组加入）拍合影，导出 PNG
+
+### 怎么投稿
+
+1. 打开仓库的 **Issues → 提交我的宠物**
+2. 标题写成：`[宠物投稿] 你的宠物名`（`[宠物投稿]` 后面必须有名字）
+3. 填写昵称、一句话介绍；分组选填，填的话只写 `1`–`33` 的数字
+4. 上传两个文件（文件名请保持原样）：
+   - `pet.json`
+   - `spritesheet.webp`
+5. 勾选公开展示确认后提交
+
+同一账号只展示**最近一条有效投稿**。改宠物内容就编辑原 Issue 或再开新帖覆盖。
+
+### 投稿会被收下的条件
+
+- Issue 保持开启，并带 `pet-submission` 标签（表单会自动打上）
+- 标题、昵称、介绍完整，已勾选公开展示
+- 同时附上合法的 `pet.json` 与 `spritesheet.webp`
+- 精灵图为 WebP，尺寸符合下表，且不超过 10 MB
+
+| 版本 | 网格 | 图片尺寸 | 画廊展示 |
+| --- | --- | --- | --- |
+| v1 | 8×9 | 1536×1872 | 九行基础状态 |
+| v2 | 8×11 | 1536×2288 | 前九行基础状态（末两行方位不进入选择器） |
+
+单帧 192×208。不需要自己做封面或压缩展示图，画廊构建时会自动处理。
+
+提交后稍等 Actions 部署完成，你的宠物就会出现在线上画廊。
+
+---
+
+## 写给开发者
+
+### 架构一览
+
+```text
+学员 Issue 附件
+        │
+        ▼
+GitHub Actions：校验 → 生成预览/详情图 → Vite 构建 → 部署 Pages
+        │
+        ▼
+静态站点（列表用小图，详情用同源 detail 图；原附件仅作「完整立绘」外链）
+```
+
+- **前端**：Vite + Preact + TypeScript + Tailwind → 纯静态
+- **数据**：Actions 读带标签的 Issue，写出 `pets.json` / `previews.json`
+- **图片流水线**（`scripts/build-gallery-data.mjs`，内容 hash + `.gallery-cache` 增量）：
+  - `poster`：默认状态单帧，列表静帧
+  - `preview`：默认状态低分辨率条，列表动画
+  - `detail`：全分辨率有损 WebP（q90），详情播放
+- 原 `spritesheet.webp` 仍指向 GitHub 附件，不打进 Pages 大图
+
+### 目录
+
+```text
+.github/               Issue 表单与 Pages 工作流
+lib/                   构建与前端共用的纯 JS
+scripts/               Issue 解析、预览/详情图生成
+web/public/examples/   固定示例宠物（勿塞学员投稿）
+web/public/generated/  构建产物（gitignore）
+web/src/               前端源码
+.gallery-cache/        Actions 可复用的图片缓存（gitignore）
+tests/
+gallery.config.json    仓库名、文案、投稿标签
+```
+
+### 本地开发
+
+需要 Node.js 20+。
 
 ```powershell
 npm install
 npm test
-npm run build:data:empty
-npm run dev
+npm run build:data:empty   # 无真实投稿时的空数据 + 示例图
+npm run dev                # http://localhost:4173/
 ```
-
-然后访问 `http://localhost:4173/`。`build:data:empty` 会生成被 Git 忽略的 `web/public/pets.json`、运行时配置、示例预览索引和预览图片。
 
 生产构建：
 
 ```powershell
 npm run build:data:empty
-npm run build
-# 产物在 dist/，可用任意静态服务器预览
+npm run build              # 产物在 dist/
 npm run preview
 ```
 
-如需在本地读取真实 Issue：
+拉真实 Issue：
 
 ```powershell
 $env:GITHUB_TOKEN = "你的 Token"
-$env:GITHUB_REPOSITORY = "RheinXenon/SC26-CodexPetsGallery"
+$env:GITHUB_REPOSITORY = "owner/repo"
 npm run build:data
 ```
 
-## 目录结构
+新增官方示例：复制 `web/public/examples/<id>/`，并把 `<id>` 写入 `manifest.json`。
 
-```text
-.github/
-  ISSUE_TEMPLATE/       # 投稿表单
-  workflows/            # Pages 构建与部署
-lib/                    # 构建与前端共用的纯 JS 工具
-scripts/                # Issue 解析和数据生成
-web/
-  public/
-    examples/           # 固定示例宠物
-    generated/previews/ # 构建生成的封面与预览条
-    photo-booth/        # 合影背景（可选图片资源）
-    pets.json           # 构建生成
-    previews.json
-    gallery.config.json
-  src/                  # Preact 前端源码
-dist/                   # vite build 产物（Pages 部署目录）
-.gallery-cache/         # Actions 复用的预览缓存
-tests/
-gallery.config.json
-```
+### 仓库启用
 
-新增固定示例时，复制 `web/public/examples/<pet-id>/` 并把 `<pet-id>` 加入 `manifest.json`。不要把学员投稿提交到 examples；真实投稿只存在于 Issue 与每次部署生成的 `pets.json`。
+1. 公开仓库，打开 Issues
+2. 创建标签 `pet-submission`（或与 `gallery.config.json` 中一致）
+3. 推送 `main`，Pages 来源选 **GitHub Actions**
+4. 用「提交我的宠物」试投一条
 
-## 前端能力
+工作流：`npm ci` → `build-gallery-data` → `vite build` → 上传 `dist/`。图片缓存键为 `gallery-previews-v2-`。
 
-- 产品级图鉴布局：sticky 顶栏与筛选条、信息完整卡片、动画优先详情
-- 卡片密度三档（舒适 / 标准 / 紧凑），偏好写入 localStorage
-- 分享深链：`?pet=example-bananacat` 或 `?pet=issue-12`，详情内可复制链接
-- 合影：自由多选 + 按组加入（1–33），最多 12 只；预设渐变背景；使用**同源 poster** 合成并导出 PNG（避免跨域 canvas 污染）
+### 迁到正式仓库
 
-## 精灵图兼容
+复制：
 
-| 版本 | 网格 | 图片尺寸 | 当前展示范围 |
-| --- | --- | --- | --- |
-| v1 | 8×9 | 1536×1872 | 九行基础状态 |
-| v2 | 8×11 | 1536×2288 | 前九行基础状态 |
+`.github/` · `lib/` · `scripts/` · `web/` · `tests/` · `gallery.config.json` · `package.json` · `package-lock.json`
 
-单帧 192×208。v2 末两行方位注视不进入状态选择器。
-
-## GitHub 仓库设置
-
-1. 创建公开仓库并启用 Issues。
-2. 创建 `pet-submission` 标签。
-3. 推送到 `main`。
-4. Pages 来源设为 **GitHub Actions**。
-5. 通过「提交我的宠物」表单投稿。
-
-工作流：`npm ci` → 生成画廊数据/预览 → `vite build` → 上传 `dist/`。预览图仍走 Actions cache；前端构建通常只需数秒。
-
-## 投稿有效条件
-
-- Issue 开启且带 `pet-submission`
-- 标题写成 `[宠物投稿] 宠物名`（`[宠物投稿]` 后必须有名字）
-- 昵称与介绍非空
-- 分组可空；填写时仅 1–33
-- 具名附件 `pet.json` + `spritesheet.webp`（GitHub 托管）
-- WebP 尺寸 v1/v2 合法且 ≤10 MB
-- 已勾选公开展示确认
-
-## 迁移到正式仓库
-
-复制 `.github/`、`lib/`、`scripts/`、`web/`、`gallery.config.json`、`package.json`、`package-lock.json` 与 `tests/`。修改 `gallery.config.json` 中的仓库地址与文案即可。
+改 `gallery.config.json` 里的 `repository`、`pageTitle`、`eventName`（以及如需的 `submissionLabel`），按上一节打开 Pages 即可。

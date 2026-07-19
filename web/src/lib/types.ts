@@ -35,6 +35,8 @@ export type Pet = {
   spriteGrid: SpriteGrid;
   posterUrl?: string | null;
   previewUrl?: string | null;
+  /** Same-origin full-grid sheet optimized for the detail player. */
+  detailUrl?: string | null;
   previewFrameWidth?: number;
   previewFrameHeight?: number;
   githubLogin?: string;

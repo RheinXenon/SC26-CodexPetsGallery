@@ -16,9 +16,12 @@ const FIELD_LABELS = {
 
 const PET_TITLE_PREFIX = "[宠物投稿]";
 const MAX_SPRITE_BYTES = 10 * 1024 * 1024;
-const PREVIEW_PIPELINE_VERSION = "v1";
+// v2: also emit a full-resolution lossy detail sheet for the dialog player.
+const PREVIEW_PIPELINE_VERSION = "v2";
 const PREVIEW_FRAME_WIDTH = 96;
 const PREVIEW_FRAME_HEIGHT = 104;
+const DETAIL_WEBP_QUALITY = 90;
+const DETAIL_WEBP_ALPHA_QUALITY = 100;
 const DEFAULT_BUILD_CONCURRENCY = 4;
 const EXPECTED_SPRITE_FORMATS = new Map([
   ["1536x1872", { formatVersion: "v1", rows: 9 }],
@@ -240,20 +243,31 @@ function previewFileName(petId, digest, kind) {
 }
 
 async function materializePreviewAssets(rootDir, previewAssets) {
-  if (!previewAssets?.posterUrl || !previewAssets?.previewUrl) return false;
+  if (!previewAssets?.posterUrl || !previewAssets?.previewUrl || !previewAssets?.detailUrl) {
+    return false;
+  }
 
   const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
   const publishedDir = path.join(rootDir, "web", "public", "generated", "previews");
   const posterName = path.posix.basename(previewAssets.posterUrl);
   const previewName = path.posix.basename(previewAssets.previewUrl);
+  const detailName = path.posix.basename(previewAssets.detailUrl);
   const cachedPoster = path.join(cacheDir, posterName);
   const cachedPreview = path.join(cacheDir, previewName);
-  if (!await fileExists(cachedPoster) || !await fileExists(cachedPreview)) return false;
+  const cachedDetail = path.join(cacheDir, detailName);
+  if (
+    !await fileExists(cachedPoster)
+    || !await fileExists(cachedPreview)
+    || !await fileExists(cachedDetail)
+  ) {
+    return false;
+  }
 
   await mkdir(publishedDir, { recursive: true });
   await Promise.all([
     copyFile(cachedPoster, path.join(publishedDir, posterName)),
     copyFile(cachedPreview, path.join(publishedDir, previewName)),
+    copyFile(cachedDetail, path.join(publishedDir, detailName)),
   ]);
   return true;
 }
@@ -276,9 +290,11 @@ export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir
     .slice(0, 16);
   const posterName = previewFileName(petId, digest, "poster");
   const previewName = previewFileName(petId, digest, "preview");
+  const detailName = previewFileName(petId, digest, "detail");
   const cacheDir = path.join(rootDir, ".gallery-cache", "previews");
   const cachedPoster = path.join(cacheDir, posterName);
   const cachedPreview = path.join(cacheDir, previewName);
+  const cachedDetail = path.join(cacheDir, detailName);
   await mkdir(cacheDir, { recursive: true });
 
   const top = defaultState.row * frameHeight;
@@ -309,11 +325,25 @@ export async function generatePreviewAssets(source, { petId, spriteGrid, rootDir
         .webp({ lossless: true, effort: 6 })
         .toFile(cachedPreview)
   ));
-  await Promise.all([posterTask, previewTask]);
+  // Full-resolution lossy sheet for the detail dialog: same grid/frames as the
+  // original, much smaller than author uploads, cached by content hash.
+  const detailTask = fileExists(cachedDetail).then((exists) => (
+    exists
+      ? null
+      : sharp(source)
+        .webp({
+          quality: DETAIL_WEBP_QUALITY,
+          alphaQuality: DETAIL_WEBP_ALPHA_QUALITY,
+          effort: 6,
+        })
+        .toFile(cachedDetail)
+  ));
+  await Promise.all([posterTask, previewTask, detailTask]);
 
   const previewAssets = {
     posterUrl: `generated/previews/${posterName}`,
     previewUrl: `generated/previews/${previewName}`,
+    detailUrl: `generated/previews/${detailName}`,
     previewFrameWidth: PREVIEW_FRAME_WIDTH,
     previewFrameHeight: PREVIEW_FRAME_HEIGHT,
   };

@@ -41,14 +41,16 @@ export async function loadExamples(): Promise<Pet[]> {
       if (!validateSpriteGrid(spriteGrid)) {
         throw new Error(`${pet.id || id} 的宠物图配置无效`);
       }
+      const previews = previewData?.examples?.[id] ?? {};
       return {
         kind: "example" as const,
         id: pet.id?.startsWith("example-") ? pet.id : `example-${id}`,
         petName: pet.displayName,
         nickname: "SC26 示例",
         description: pet.description,
+        // Author/original sheet — used for “打开完整立绘”. Playback prefers detailUrl.
         spriteUrl: `examples/${encodeURIComponent(id)}/${pet.spritesheetPath}`,
-        ...(previewData?.examples?.[id] ?? {}),
+        ...previews,
         configUrl: `examples/${encodeURIComponent(id)}/pet.json`,
         spriteGrid,
         accent: ACCENTS[index % ACCENTS.length],
@@ -76,7 +78,10 @@ export async function loadSubmissions() {
         petName: String(pet.petName ?? ""),
         nickname: String(pet.nickname ?? ""),
         description: String(pet.description ?? ""),
+        // Keep the GitHub attachment as the canonical original; detailUrl is for playback.
         spriteUrl: String(pet.spritesheetUrl),
+        spritesheetUrl: String(pet.spritesheetUrl),
+        detailUrl: pet.detailUrl ? String(pet.detailUrl) : null,
         spriteGrid,
         accent: ACCENTS[(index + 3) % ACCENTS.length],
       } as Pet;

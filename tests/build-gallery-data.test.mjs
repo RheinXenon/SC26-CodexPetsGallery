@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import {
   describeSubmissionRejection,
@@ -8,6 +10,7 @@ import {
   extractFields,
   extractPetAttachments,
   extractPetName,
+  generatePreviewAssets,
   hydrateSubmission,
   isAllowedGithubAttachment,
   parseSubmission,
@@ -237,6 +240,45 @@ test("标准 WebP 精灵图通过校验后会生成安全配置", async () => {
   assert.equal(hydrated.spriteGrid.formatVersion, "v1");
   assert.equal(hydrated.spriteGrid.columns, 8);
   assert.equal(hydrated.spriteGrid.states.length, 9);
+});
+
+test("预览流水线会生成封面、列表预览条和详情用有损精灵图", async () => {
+  const rootDir = await mkdtemp(path.join(os.tmpdir(), "gallery-preview-"));
+  try {
+    const spritesheet = await readFile(
+      new URL("../web/public/examples/bananacat/spritesheet.webp", import.meta.url),
+    );
+    const spriteGrid = normalizeSpriteGrid({ formatVersion: "v1", columns: 8, rows: 9 });
+    const assets = await generatePreviewAssets(spritesheet, {
+      petId: "issue-7",
+      spriteGrid,
+      rootDir,
+    });
+
+    assert.match(assets.posterUrl, /generated\/previews\/issue-7-[\da-f]+-poster\.webp$/);
+    assert.match(assets.previewUrl, /generated\/previews\/issue-7-[\da-f]+-preview\.webp$/);
+    assert.match(assets.detailUrl, /generated\/previews\/issue-7-[\da-f]+-detail\.webp$/);
+    assert.equal(assets.previewFrameWidth, 96);
+    assert.equal(assets.previewFrameHeight, 104);
+
+    const detailPath = path.join(rootDir, "web", "public", assets.detailUrl);
+    const detailStat = await stat(detailPath);
+    assert.ok(detailStat.size > 50_000, "detail sheet should exist and be non-trivial");
+    assert.ok(
+      detailStat.size < spritesheet.byteLength * 0.75,
+      "detail sheet should be meaningfully smaller than the original upload",
+    );
+
+    // Second run hits content-addressed cache and returns the same paths.
+    const again = await generatePreviewAssets(spritesheet, {
+      petId: "issue-7",
+      spriteGrid,
+      rootDir,
+    });
+    assert.deepEqual(again, assets);
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
 });
 
 test("WebP 头可以识别 v2 精灵图尺寸", () => {

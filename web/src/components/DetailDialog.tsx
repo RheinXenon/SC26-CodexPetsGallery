@@ -3,6 +3,7 @@ import {
   SpriteAnimator,
   drawSpriteFrame,
   getDefaultState,
+  getDetailPlaybackUrl,
   loadSpriteImage,
   safeExternalUrl,
 } from "../lib/media";
@@ -63,7 +64,7 @@ export function DetailDialog({ pet, onClose }: Props) {
     const target = previewRef.current;
     target.replaceChildren();
 
-    const imageUrl = safeExternalUrl(pet.spriteUrl);
+    const imageUrl = getDetailPlaybackUrl(pet);
     if (!imageUrl) {
       setLoadError(true);
       return;
@@ -109,7 +110,7 @@ export function DetailDialog({ pet, onClose }: Props) {
         const canvas = document.querySelector<HTMLCanvasElement>(`[data-state-thumb="${pet.id}-${state.id}"]`);
         if (!canvas) return;
         try {
-          const imageUrl = safeExternalUrl(pet.spriteUrl);
+          const imageUrl = getDetailPlaybackUrl(pet);
           if (!imageUrl) throw new Error("invalid");
           const image = await loadSpriteImage(imageUrl);
           const context = canvas.getContext("2d");
